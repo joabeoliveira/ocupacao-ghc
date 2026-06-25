@@ -1,0 +1,77 @@
+openapi: 3.0.3
+info:
+  title: Ocupação de Leitos - API mínima
+  version: 0.1.0
+  description: API mínima para ingestão e consulta de dados do MVP de ocupação de leitos.
+servers:
+  - url: /api
+paths:
+  /ingest:
+    post:
+      summary: Ingestão de arquivo (trigger)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                origem_arquivo:
+                  type: string
+                  description: Caminho ou identificador do arquivo a ser processado
+      responses:
+        '200':
+          description: Ingestão iniciada
+  /leitos:
+    get:
+      summary: Listar leitos/pacientes filtráveis
+      parameters:
+        - in: query
+          name: especialidade
+          schema:
+            type: string
+        - in: query
+          name: unidade
+          schema:
+            type: string
+        - in: query
+          name: data_inicio
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: data_fim
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Lista de registros
+  /metrics:
+    get:
+      summary: Métricas de ocupação
+      responses:
+        '200':
+          description: Métricas agregadas (ocupação global e por unidade)
+components:
+  schemas:
+    OcupacaoRecord:
+      type: object
+      properties:
+        paciente_id:
+          type: string
+        data_internacao:
+          type: string
+          format: date-time
+        data_alta:
+          type: string
+          format: date-time
+        idade_anos_int:
+          type: integer
+        especialidade:
+          type: string
+        unidade:
+          type: string
+        status:
+          type: string
+        origem_arquivo:
+          type: string

@@ -1,0 +1,1 @@
+"""Routers da API de censo e upload."""

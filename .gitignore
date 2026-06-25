@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Ambiente local
+.env
+.venv/
+venv/
+
+# Build e temporarios
+backend/tmp/
+
+# Dados sensiveis e arquivos brutos locais
+dados/
+*.csv
+*.xls
+*.xlsx
