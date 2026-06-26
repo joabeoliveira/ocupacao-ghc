@@ -54,6 +54,9 @@ Repositório:
 - `GET /api/censo/kpis`
 - `GET /api/censo/pacientes`
 - `POST /api/upload/censo`
+- `POST /api/upload/historico`
+- `POST /api/upload/arquivo` (auto-deteccao de tipo)
+- `GET /upload` (interface web para envio de arquivo)
 
 ## Verificações pós-deploy
 

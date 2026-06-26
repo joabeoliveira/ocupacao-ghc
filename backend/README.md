@@ -9,6 +9,7 @@
 - `app/schemas.py`: contratos Pydantic da API
 - `app/routers/censo.py`: endpoints de KPIs e listagem do censo vivo
 - `app/routers/upload.py`: upload do censo diario
+- `app/routers/ui.py`: interface web para upload via navegador (`/upload`)
 - `etl_process.py`: integracao com o ETL existente em `src/etl/etl_process.py`
 
 ## Variaveis de ambiente
@@ -34,3 +35,11 @@ uvicorn app.main:app --reload --app-dir backend
 O repositório já inclui um `Dockerfile` na raiz para deploy no Easypanel.
 
 Veja o guia em `backend/DEPLOY_EASYPANEL.md`.
+
+## Upload sem curl
+
+Depois de subir a API, abra:
+
+- `/upload`
+
+Essa tela envia arquivos para os endpoints de upload sem depender de comandos no terminal.

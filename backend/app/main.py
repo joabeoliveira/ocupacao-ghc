@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import censo, upload
+from app.routers import censo, ui, upload
 
 
 app = FastAPI(title=settings.app_name)
@@ -19,6 +19,7 @@ app.add_middleware(
 
 app.include_router(censo.router, prefix=settings.api_prefix)
 app.include_router(upload.router, prefix=settings.api_prefix)
+app.include_router(ui.router)
 
 
 @app.get("/health")
