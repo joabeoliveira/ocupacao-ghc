@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import logging
 import os
@@ -98,14 +99,45 @@ def read_input_file(path: Path) -> pd.DataFrame:
         return pd.read_excel(path, header=None, engine="xlrd")
     if suffix == ".xlsx":
         return pd.read_excel(path, header=None, engine="openpyxl")
+    # CSVs do esusreport podem ter linhas de metadado com numero de colunas variavel,
+    # quebrando o parser padrao do pandas; fazemos parse manual e normalizamos o shape.
+    decoded = None
     last_error = None
     for encoding in ("utf-8", "utf-8-sig", "latin1", "cp1252"):
         try:
-            return pd.read_csv(path, header=None, sep=None, engine="python", encoding=encoding)
+            decoded = path.read_text(encoding=encoding)
+            break
         except Exception as exc:  # pragma: no cover - fallback chain
             last_error = exc
-            continue
-    raise RuntimeError(f"Falha ao ler CSV {path.name}: {last_error}")
+    if decoded is None:
+        raise RuntimeError(f"Falha ao ler CSV {path.name}: {last_error}")
+
+    lines = decoded.splitlines()
+    if not lines:
+        return pd.DataFrame()
+
+    # Detecta delimitador usando linhas candidatas de cabecalho.
+    delimiter = ","
+    for line in lines[:30]:
+        upper_line = normalize_token(line)
+        if "DATA_INTERNACAO" in upper_line or "STATUS LEITO" in upper_line:
+            comma_count = line.count(",")
+            semicolon_count = line.count(";")
+            tab_count = line.count("\t")
+            if semicolon_count > comma_count and semicolon_count >= tab_count:
+                delimiter = ";"
+            elif tab_count > comma_count and tab_count > semicolon_count:
+                delimiter = "\t"
+            break
+
+    reader = csv.reader(lines, delimiter=delimiter, quotechar='"')
+    rows = [row for row in reader]
+    if not rows:
+        return pd.DataFrame()
+
+    max_cols = max(len(row) for row in rows)
+    normalized_rows = [row + [None] * (max_cols - len(row)) for row in rows]
+    return pd.DataFrame(normalized_rows)
 
 
 def make_unique_headers(headers: list[str]) -> list[str]:
