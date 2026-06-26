@@ -5,6 +5,7 @@ import hashlib
 import logging
 import os
 import re
+import unicodedata
 import uuid
 from datetime import date
 from pathlib import Path
@@ -24,6 +25,13 @@ def clean_string(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def normalize_token(value: Any) -> str:
+    text = clean_string(value) or ""
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    return re.sub(r"\s+", " ", text).strip().upper()
 
 
 def clean_int(value: Any) -> int | None:
@@ -90,7 +98,14 @@ def read_input_file(path: Path) -> pd.DataFrame:
         return pd.read_excel(path, header=None, engine="xlrd")
     if suffix == ".xlsx":
         return pd.read_excel(path, header=None, engine="openpyxl")
-    return pd.read_csv(path, header=None)
+    last_error = None
+    for encoding in ("utf-8", "utf-8-sig", "latin1", "cp1252"):
+        try:
+            return pd.read_csv(path, header=None, sep=None, engine="python", encoding=encoding)
+        except Exception as exc:  # pragma: no cover - fallback chain
+            last_error = exc
+            continue
+    raise RuntimeError(f"Falha ao ler CSV {path.name}: {last_error}")
 
 
 def make_unique_headers(headers: list[str]) -> list[str]:
@@ -117,21 +132,23 @@ def extract_metadata_and_table(path: Path) -> tuple[dict[str, Any], pd.DataFrame
     for index, row in raw.iterrows():
         values = [clean_string(value) for value in row.tolist()]
         first = values[0] if values else None
+        first_norm = normalize_token(first)
+        normalized_values = [normalize_token(v) for v in values if v is not None]
 
-        if first and first.startswith("Período"):
+        if first_norm.startswith("PERIODO"):
             metadata["periodo_texto"] = first
             metadata["periodo_referencia_inicio"], metadata["periodo_referencia_fim"] = parse_period_line(first)
 
-        if first and first.startswith("Data Impressão"):
+        if first_norm.startswith("DATA IMPRESSAO"):
             _, _, date_text = first.partition(":")
             metadata["data_impressao_arquivo"] = parse_datetime_br(date_text.strip())
 
-        if values and any(value == "DATA_INTERNACAO" for value in values):
+        if values and any(value in {"DATA_INTERNACAO", "DATA INTERNACAO"} for value in normalized_values):
             header_index = index
             metadata["tipo_arquivo_detectado"] = "historico_internacao"
             break
 
-        if values and any(value == "STATUS LEITO" for value in values):
+        if values and any(value == "STATUS LEITO" for value in normalized_values):
             header_index = index
             metadata["tipo_arquivo_detectado"] = "censo_diario"
             break

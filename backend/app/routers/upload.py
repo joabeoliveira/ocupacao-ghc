@@ -45,6 +45,8 @@ async def upload_censo(file: UploadFile = File(...)) -> UploadCensoResponse:
             lote_importacao_id=lote_importacao_id,
             linhas_processadas=len(df),
         )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Falha ao processar arquivo de censo: {exc}") from exc
     finally:
         tmp_path.unlink(missing_ok=True)
 
@@ -63,6 +65,8 @@ async def upload_historico(file: UploadFile = File(...)) -> UploadCensoResponse:
             lote_importacao_id=lote_importacao_id,
             linhas_processadas=len(df),
         )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Falha ao processar arquivo historico: {exc}") from exc
     finally:
         tmp_path.unlink(missing_ok=True)
 
@@ -82,5 +86,7 @@ async def upload_arquivo_auto(file: UploadFile = File(...)) -> UploadCensoRespon
             lote_importacao_id=lote_importacao_id,
             linhas_processadas=len(df),
         )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Falha ao processar arquivo (auto): {exc}") from exc
     finally:
         tmp_path.unlink(missing_ok=True)
