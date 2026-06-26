@@ -85,6 +85,7 @@ def get_pacientes_internados(
     unidade: str | None = Query(default=None),
     data_inicio: date | None = Query(default=None),
     data_fim: date | None = Query(default=None),
+    min_dias: int | None = Query(default=None, ge=0),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -94,6 +95,8 @@ def get_pacientes_internados(
         base_query = base_query.where(OcupacaoLeitoGHC.especialidade == especialidade)
     if unidade:
         base_query = base_query.where(OcupacaoLeitoGHC.unidade == unidade)
+    if min_dias is not None:
+        base_query = base_query.where(OcupacaoLeitoGHC.dias_internacao >= min_dias)
 
     total = db.scalar(select(func.count()).select_from(base_query.subquery())) or 0
 
