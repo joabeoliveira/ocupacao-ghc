@@ -377,6 +377,26 @@ def get_ocupacao_table_definition(metadata: MetaData) -> Table:
     )
 
 
+def _sanitize_record_for_sql(record: dict[str, Any]) -> dict[str, Any]:
+    sanitized: dict[str, Any] = {}
+    for key, value in record.items():
+        if value is None:
+            sanitized[key] = None
+            continue
+
+        # Garante que NaT/NaN/<NA> nao cheguem ao MySQL como strings invalidas.
+        if pd.isna(value):
+            sanitized[key] = None
+            continue
+
+        if isinstance(value, pd.Timestamp):
+            sanitized[key] = value.to_pydatetime()
+            continue
+
+        sanitized[key] = value
+    return sanitized
+
+
 def persist_dataframe(df: pd.DataFrame, engine) -> int:
     # Higienizacao final para evitar erros de NOT NULL por linhas incompletas do arquivo.
     work = df.copy()
@@ -406,7 +426,8 @@ def persist_dataframe(df: pd.DataFrame, engine) -> int:
 
     metadata = MetaData()
     table = get_ocupacao_table_definition(metadata)
-    records = work.where(pd.notna(work), None).to_dict(orient="records")
+    raw_records = work.to_dict(orient="records")
+    records = [_sanitize_record_for_sql(record) for record in raw_records]
     if not records:
         LOGGER.warning("Nenhuma linha valida para persistir apos higienizacao.")
         return 0
