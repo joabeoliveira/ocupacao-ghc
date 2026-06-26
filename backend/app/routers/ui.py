@@ -128,13 +128,96 @@ def dashboard_page() -> str:
         radial-gradient(circle at top left, rgba(0, 92, 153, 0.08), transparent 28%),
         linear-gradient(180deg, #f7fbff 0%, var(--bg) 100%);
       margin: 0;
-      padding: 24px;
+      min-height: 100vh;
       color: var(--text);
     }
-    .wrap { max-width: 1120px; margin: 0 auto; }
-    .header { display:flex; align-items:center; justify-content:space-between; gap: 16px; }
+    .layout { display:grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+    .sidebar {
+      background: rgba(255,255,255,0.84);
+      backdrop-filter: blur(10px);
+      border-right: 1px solid var(--panel-border);
+      padding: 24px 18px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      box-sizing: border-box;
+    }
+    .brand { font-size: 18px; font-weight: 700; color: var(--brand-strong); margin: 0; }
+    .brand-subtitle { margin: 6px 0 18px; color: var(--muted); font-size: 13px; }
+    .nav { display:flex; flex-direction:column; gap:8px; margin-top: 18px; }
+    .nav a {
+      color: var(--text);
+      text-decoration: none;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      font-weight: 600;
+    }
+    .nav a:hover { background: rgba(0, 92, 153, 0.06); border-color: var(--panel-border); }
+    .nav a.primary { background: var(--brand); color: #fff; }
+    .nav a.primary:hover { background: var(--brand-strong); border-color: transparent; }
+    .sidebar-note {
+      margin-top: 18px;
+      padding: 12px;
+      border-radius: 12px;
+      background: #f6fbff;
+      border: 1px solid #dcebf7;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .main { padding: 24px; }
+    .shell { max-width: 1200px; margin: 0 auto; }
+    .header { display:flex; align-items:center; justify-content:space-between; gap: 16px; margin-bottom: 16px; }
     h1 { color:var(--brand-strong); margin:0; letter-spacing:-0.02em; }
     .subtitle { margin: 8px 0 0; color: var(--muted); }
+    .header-actions { display:flex; gap: 10px; align-items:center; }
+    .pill-link {
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:10px 12px;
+      border-radius: 999px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      color: var(--brand);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .section-title { margin: 20px 0 10px; display:flex; align-items:end; justify-content:space-between; gap:12px; }
+    .section-title h2 { margin:0; font-size: 18px; color: var(--brand-strong); }
+    .section-title p { margin: 0; color: var(--muted); font-size: 13px; }
+    .filters {
+      margin-top: 14px;
+      padding: 16px;
+      background: rgba(255,255,255,0.9);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(16,24,40,0.06);
+    }
+    .filters-grid {
+      display:grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      align-items:end;
+    }
+    .field { display:flex; flex-direction:column; gap:6px; min-width: 0; }
+    .field label { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; }
+    .field input, .field select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #cfd8e3;
+      box-sizing: border-box;
+      background: #fff;
+    }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    .secondary-btn {
+      background:#eaf2f8;
+      color:var(--brand-strong);
+      border:1px solid #cdddea;
+      cursor:pointer;
+    }
     .cards { display:grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap:12px; margin-top:16px; }
     .card {
       background:var(--panel);
@@ -173,77 +256,136 @@ def dashboard_page() -> str:
     button { background:var(--brand); color:#fff; cursor:pointer; border:none }
     a { color:var(--brand); text-decoration:none; font-weight:600; }
     .muted { color:var(--muted); }
+    .chart-list { display:flex; flex-direction:column; gap:10px; padding: 8px 0 2px; }
+    .chart-row { display:grid; grid-template-columns: minmax(160px, 1.6fr) minmax(0, 3fr) 72px; gap: 12px; align-items:center; }
+    .chart-name { font-size: 13px; color: var(--text); font-weight: 600; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .chart-track { height: 14px; background: #edf2f7; border-radius: 999px; overflow:hidden; }
+    .chart-fill { height: 100%; background: linear-gradient(90deg, var(--brand), var(--accent)); border-radius: 999px; }
+    .chart-value { text-align:right; color: var(--brand-strong); font-weight: 700; font-size: 13px; }
+    .patient-section { margin-top: 18px; }
+    @media (max-width: 1100px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--panel-border); }
+      .filters-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .chart-row { grid-template-columns: 1fr; }
+      .chart-value { text-align:left; }
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="header">
-      <div>
-        <h1>EGAA - Dashboard</h1>
-        <p class="subtitle">Visao rapida dos internados e das unidades com maior volume.</p>
+  <div class="layout">
+    <aside class="sidebar">
+      <p class="brand">EGAA</p>
+      <p class="brand-subtitle">Painel de regulação e censo</p>
+      <nav class="nav">
+        <a class="primary" href="/dashboard">Dashboard</a>
+        <a href="#pacientes">Pacientes</a>
+        <a href="#unidadesSection">Longa Permanência</a>
+        <a href="/upload">Importações</a>
+        <a href="#resumo">Resumo</a>
+      </nav>
+      <div class="sidebar-note">
+        A pergunta principal desta tela é simples: <strong>como está a ocupação hoje?</strong>
+        Use os filtros acima para refinar a leitura.
       </div>
-      <a href="/upload">Ir para Upload</a>
-    </div>
-
-    <div class="cards" id="kpis">
-      <div class="card">Carregando...</div>
-    </div>
-
-    <div class="section" id="unidadesSection">
-      <div class="section-header">
-        <div>
-          <h2>Unidades com mais pacientes</h2>
-          <p id="unidadesResumo" class="muted">Aguardando dados...</p>
+    </aside>
+    <main class="main">
+      <div class="shell">
+        <div class="header">
+          <div>
+            <h1>Dashboard</h1>
+            <p class="subtitle">Visão rápida dos internados, da concentração por unidade e da lista filtrável de pacientes.</p>
+          </div>
+          <div class="header-actions">
+            <a class="pill-link" href="/upload">Ir para Upload</a>
+          </div>
         </div>
+
+        <section id="resumo" class="filters">
+          <div class="filters-grid">
+            <div class="field">
+              <label for="especialidade">Especialidade</label>
+              <input id="especialidade" placeholder="ex: DERMATO" />
+            </div>
+            <div class="field">
+              <label for="unidade">Unidade</label>
+              <input id="unidade" placeholder="ex: HFB" />
+            </div>
+            <div class="field">
+              <label for="dataInicio">Data inicial</label>
+              <input id="dataInicio" type="date" />
+            </div>
+            <div class="field">
+              <label for="dataFim">Data final</label>
+              <input id="dataFim" type="date" />
+            </div>
+            <div class="field">
+              <label for="pageSizeSelect">Itens por página</label>
+              <select id="pageSizeSelect">
+                <option value="5">5</option>
+                <option value="10" selected>10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+              </select>
+            </div>
+          </div>
+          <div class="actions" style="margin-top: 12px;">
+            <button id="filtrar">Aplicar filtros</button>
+            <button id="refresh" class="secondary-btn">Recarregar</button>
+          </div>
+        </section>
+
+        <div class="cards" id="kpis">
+          <div class="card">Carregando...</div>
+        </div>
+
+        <section class="section" id="unidadesSection">
+          <div class="section-header">
+            <div>
+              <h2>Unidades com mais pacientes</h2>
+              <p id="unidadesResumo" class="muted">Aguardando dados...</p>
+            </div>
+          </div>
+          <div class="section-body">
+            <div class="chart-list" id="unidadesChart">
+              <div class="muted">Aguardando dados...</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="patient-section" id="pacientes">
+          <div class="section-title">
+            <div>
+              <h2>Pacientes internados</h2>
+              <p>Lista filtrável ordenada por tempo de internação.</p>
+            </div>
+            <p class="muted" id="pageInfo">Página 1</p>
+          </div>
+
+          <div class="section">
+            <div class="section-body">
+              <table aria-live="polite">
+                <thead>
+                  <tr><th>Prontuario</th><th>Nome</th><th>Idade</th><th>Dias</th><th>Especialidade</th><th>Unidade</th></tr>
+                </thead>
+                <tbody id="rows">
+                </tbody>
+              </table>
+              <div style="margin-top:12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <button id="prev">Anterior</button>
+                <button id="next">Próxima</button>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
-      <div class="section-body">
-        <table>
-          <thead>
-            <tr><th>Unidade</th><th>Pacientes</th></tr>
-          </thead>
-          <tbody id="unidadesRows">
-            <tr><td colspan="2">Aguardando dados...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="controls">
-      <label>Especialidade: <input id="especialidade" placeholder="ex: DERMATO" /></label>
-      <label>Unidade: <input id="unidade" placeholder="ex: HFB" /></label>
-      <label>Data inicial: <input id="dataInicio" type="date" /></label>
-      <label>Data final: <input id="dataFim" type="date" /></label>
-      <label>Itens por página: 
-        <select id="pageSizeSelect">
-          <option value="5">5</option>
-          <option value="10" selected>10</option>
-          <option value="20">20</option>
-          <option value="50">50</option>
-        </select>
-      </label>
-      <button id="filtrar">Filtrar</button>
-      <button id="refresh" style="background:#00994d;margin-left:8px">Recarregar</button>
-    </div>
-
-    <table aria-live="polite">
-      <thead>
-        <tr><th>Prontuario</th><th>Nome</th><th>Idade</th><th>Dias</th><th>Especialidade</th><th>Unidade</th></tr>
-      </thead>
-      <tbody id="rows">
-      </tbody>
-    </table>
-
-    <div style="margin-top:12px; display:flex; gap:8px; align-items:center">
-      <button id="prev">Anterior</button>
-      <span id="pageInfo">Página 1</span>
-      <button id="next">Próxima</button>
-    </div>
+    </main>
   </div>
 
   <script>
     const API_PREFIX = '/api';
     const kpisEl = document.getElementById('kpis');
-    const unidadesRowsEl = document.getElementById('unidadesRows');
+    const unidadesChartEl = document.getElementById('unidadesChart');
     const unidadesResumoEl = document.getElementById('unidadesResumo');
     const rowsEl = document.getElementById('rows');
     const especialidadeEl = document.getElementById('especialidade');
@@ -277,9 +419,18 @@ def dashboard_page() -> str:
       unidadesResumoEl.textContent = unidades.length
         ? `Mostrando as ${topUnidades.length} unidades com mais pacientes de um total de ${unidades.length}.`
         : 'Nenhuma unidade retornada pela API.';
-      unidadesRowsEl.innerHTML = topUnidades.length
-        ? topUnidades.map(u => `<tr><td>${u.unidade || '--'}</td><td>${u.total_pacientes}</td></tr>`).join('')
-        : '<tr><td colspan="2">Nenhuma unidade para exibir.</td></tr>';
+      const maxValue = topUnidades.reduce((acc, item) => Math.max(acc, item.total_pacientes || 0), 0) || 1;
+      unidadesChartEl.innerHTML = topUnidades.length
+        ? topUnidades.map(u => {
+            const width = Math.max(6, Math.round(((u.total_pacientes || 0) / maxValue) * 100));
+            return `
+              <div class="chart-row">
+                <div class="chart-name" title="${u.unidade || '--'}">${u.unidade || '--'}</div>
+                <div class="chart-track" aria-hidden="true"><div class="chart-fill" style="width:${width}%"></div></div>
+                <div class="chart-value">${u.total_pacientes}</div>
+              </div>`;
+          }).join('')
+        : '<div class="muted">Nenhuma unidade para exibir.</div>';
     }
 
     async function loadPacientes() {
