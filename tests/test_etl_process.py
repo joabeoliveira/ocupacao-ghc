@@ -1,8 +1,14 @@
-from pathlib import Path
-
 import pandas as pd
 
-from src.etl.etl_process import build_hash_registro, clean_int, normalize_censo, normalize_historico, parse_dias_internacao
+from src.etl.etl_process import (
+    _sanitize_record_for_sql,
+    build_hash_registro,
+    clean_int,
+    normalize_censo,
+    normalize_historico,
+    parse_dias_internacao,
+    prepare_dataframe,
+)
 
 
 def test_clean_int_extracts_digits():
@@ -80,3 +86,42 @@ def test_normalize_censo_maps_core_columns():
     assert out.loc[0, "idade_anos"] == 65
     assert out.loc[0, "data_snapshot"] == pd.Timestamp("2026-06-25").date()
     assert out.loc[0, "fonte_dado"] == "censo_diario"
+
+
+def test_sanitize_record_for_sql_converts_pandas_nulls_and_timestamps():
+    record = {
+        "data_alta": pd.NaT,
+        "idade_anos": pd.NA,
+        "dias_internacao": float("nan"),
+        "data_internacao": pd.Timestamp("2026-06-20 08:30"),
+        "prontuario": "8429393",
+    }
+
+    sanitized = _sanitize_record_for_sql(record)
+
+    assert sanitized["data_alta"] is None
+    assert sanitized["idade_anos"] is None
+    assert sanitized["dias_internacao"] is None
+    assert sanitized["data_internacao"].isoformat() == "2026-06-20T08:30:00"
+    assert sanitized["prontuario"] == "8429393"
+
+
+def test_prepare_dataframe_detects_csv_with_metadata_header(tmp_path):
+    csv_path = tmp_path / "censo-com-metadados.csv"
+    csv_path.write_text(
+        "Relatorio exportado pelo esusreport\n"
+        "Data Impressao: 25/06/2026 07:57\n"
+        "STATUS LEITO,PRONT,NOME,IDADE (a),IDADE (m),DATA INTERNACAO,"
+        "CLINICA RESPONSAVEL (FORA DE CLINICA),UNIDADE,ENFERMARIA,LEITO,CID,CID DESCRICAO,DIAS INTER.\n"
+        "OCUPADO,8429393,CLEA COSTA MATIAS,65,9,20/06/2026,MEDICINA INTENSIVA,"
+        "PREDIO 1,GHC P1 1A,117.01,R229,TUMEFACAO,5\n",
+        encoding="utf-8",
+    )
+
+    out = prepare_dataframe(csv_path, lote_importacao_id="lote-censo")
+
+    assert len(out) == 1
+    assert out.loc[0, "fonte_dado"] == "censo_diario"
+    assert out.loc[0, "prontuario"] == "8429393"
+    assert out.loc[0, "data_snapshot"] == pd.Timestamp("2026-06-25").date()
+    assert out.loc[0, "lote_importacao_id"] == "lote-censo"

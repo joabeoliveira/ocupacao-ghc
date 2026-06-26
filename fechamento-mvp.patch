@@ -1,0 +1,258 @@
+From cce726f81fc86266375660d8a26336835cfb556e Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Fri, 26 Jun 2026 12:42:37 +0000
+Subject: [PATCH] chore: fechar validacoes do MVP EGAA
+
+---
+ docs/OPERACAO.md                      | 69 +++++++++++++++++++++
+ pytest.ini                            |  2 +
+ scripts/auditoria_ocupacao_leitos.sql | 87 +++++++++++++++++++++++++++
+ tests/test_etl_process.py             | 51 +++++++++++++++-
+ 4 files changed, 206 insertions(+), 3 deletions(-)
+ create mode 100644 docs/OPERACAO.md
+ create mode 100644 pytest.ini
+ create mode 100644 scripts/auditoria_ocupacao_leitos.sql
+
+diff --git a/docs/OPERACAO.md b/docs/OPERACAO.md
+new file mode 100644
+index 0000000..287b166
+--- /dev/null
++++ b/docs/OPERACAO.md
+@@ -0,0 +1,69 @@
++# Operação e fechamento do MVP EGAA
++
++Este guia consolida os passos finais para homologar o MVP depois que o banco `ocupacao_leitos_ghc` já estiver populado.
++
++## 1. Pré-requisitos
++
++- API configurada com `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_HOST`, `MYSQL_PORT` e `MYSQL_DATABASE`.
++- Migration `migrations/001_create_ocupacao_leitos_esusreport.sql` aplicada no banco.
++- Dados históricos e/ou censo diário já carregados pelo ETL.
++
++## 2. Auditoria do banco populado
++
++Execute `scripts/auditoria_ocupacao_leitos.sql` no MySQL de produção ou homologação. A revisão deve confirmar:
++
++1. Totais por `fonte_dado`, lote e arquivo.
++2. Ausência de campos obrigatórios vazios: `prontuario`, `especialidade`, `hash_registro`, `lote_importacao_id` e `data_internacao`.
++3. Ausência de altas anteriores à internação.
++4. `censo_diario` sempre com `data_snapshot` preenchida.
++5. Nenhuma duplicidade lógica por `(fonte_dado, hash_registro)`.
++6. KPIs SQL compatíveis com `GET /api/censo/kpis`.
++
++Diferenças entre linhas processadas no upload e `COUNT(*)` no banco podem ser esperadas quando houver upsert pela chave única `(fonte_dado, hash_registro)`.
++
++## 3. Validação da API
++
++Com a aplicação em execução, valide os endpoints abaixo:
++
++```bash
++curl -f http://localhost:8000/health
++curl -f http://localhost:8000/api/censo/kpis
++curl -f 'http://localhost:8000/api/censo/pacientes?page=1&page_size=10'
++```
++
++Critérios mínimos de aceite:
++
++- `/health` retorna HTTP 200.
++- `/api/censo/kpis` retorna totais coerentes com a auditoria SQL.
++- `/api/censo/pacientes` pagina resultados e permite filtros por `especialidade` e `unidade`.
++- A tela `/upload` continua disponível para novas cargas operacionais.
++
++## 4. Validação automatizada local
++
++Antes de publicar alterações, rode:
++
++```bash
++python -m py_compile src/etl/etl_process.py
++pytest -q
++```
++
++Esses checks protegem principalmente parsing, normalização, geração de hash e sanitização de valores pandas nulos antes do upsert no MySQL.
++
++## 5. Checklist pós-deploy no Easypanel
++
++1. Confirmar variáveis de ambiente do MySQL no painel.
++2. Verificar logs do contêiner após o build.
++3. Acessar `GET /health`.
++4. Comparar `GET /api/censo/kpis` com a seção de KPIs do script de auditoria.
++5. Abrir `/upload` e testar um upload pequeno de censo, se aplicável.
++6. Revisar se novos uploads não criam duplicidades inesperadas.
++
++## 6. Critério de conclusão
++
++Considere o MVP concluído quando:
++
++- Testes automatizados passam.
++- Auditoria SQL não aponta inconsistências críticas.
++- API responde com dados coerentes do banco populado.
++- Deploy está documentado e reproduzível.
++- O fluxo de upload diário está validado para uso operacional.
+diff --git a/pytest.ini b/pytest.ini
+new file mode 100644
+index 0000000..a635c5c
+--- /dev/null
++++ b/pytest.ini
+@@ -0,0 +1,2 @@
++[pytest]
++pythonpath = .
+diff --git a/scripts/auditoria_ocupacao_leitos.sql b/scripts/auditoria_ocupacao_leitos.sql
+new file mode 100644
+index 0000000..9d991d6
+--- /dev/null
++++ b/scripts/auditoria_ocupacao_leitos.sql
+@@ -0,0 +1,87 @@
++-- Auditoria operacional da tabela ocupacao_leitos_ghc após carga histórica/censo.
++-- Execute no MySQL conectado ao banco configurado para o EGAA.
++
++-- 1. Resumo geral por fonte de dado.
++SELECT
++  fonte_dado,
++  COUNT(*) AS total_registros,
++  COUNT(DISTINCT hash_registro) AS hashes_distintos,
++  COUNT(DISTINCT lote_importacao_id) AS lotes_distintos,
++  MIN(data_internacao) AS primeira_internacao,
++  MAX(data_internacao) AS ultima_internacao,
++  MAX(data_snapshot) AS ultimo_snapshot
++FROM ocupacao_leitos_ghc
++GROUP BY fonte_dado
++ORDER BY fonte_dado;
++
++-- 2. Registros por lote para reconciliar linhas processadas versus linhas persistidas/upserts.
++SELECT
++  lote_importacao_id,
++  fonte_dado,
++  nome_arquivo,
++  COUNT(*) AS total_registros,
++  MIN(created_at) AS primeira_linha_criada,
++  MAX(created_at) AS ultima_linha_criada
++FROM ocupacao_leitos_ghc
++GROUP BY lote_importacao_id, fonte_dado, nome_arquivo
++ORDER BY ultima_linha_criada DESC, lote_importacao_id;
++
++-- 3. Verificação de campos obrigatórios ou críticos ausentes.
++SELECT
++  SUM(CASE WHEN prontuario IS NULL OR TRIM(prontuario) = '' THEN 1 ELSE 0 END) AS sem_prontuario,
++  SUM(CASE WHEN especialidade IS NULL OR TRIM(especialidade) = '' THEN 1 ELSE 0 END) AS sem_especialidade,
++  SUM(CASE WHEN hash_registro IS NULL OR TRIM(hash_registro) = '' THEN 1 ELSE 0 END) AS sem_hash,
++  SUM(CASE WHEN lote_importacao_id IS NULL OR TRIM(lote_importacao_id) = '' THEN 1 ELSE 0 END) AS sem_lote,
++  SUM(CASE WHEN data_internacao IS NULL THEN 1 ELSE 0 END) AS sem_data_internacao
++FROM ocupacao_leitos_ghc;
++
++-- 4. Datas incoerentes que precisam ser revisadas antes da homologação.
++SELECT
++  id,
++  prontuario,
++  nome_paciente,
++  data_internacao,
++  data_alta,
++  fonte_dado,
++  lote_importacao_id
++FROM ocupacao_leitos_ghc
++WHERE data_alta IS NOT NULL
++  AND data_internacao IS NOT NULL
++  AND data_alta < data_internacao
++ORDER BY data_alta DESC
++LIMIT 100;
++
++-- 5. Garantia lógica do censo: todo censo_diario deve ter data_snapshot.
++SELECT COUNT(*) AS censo_sem_snapshot
++FROM ocupacao_leitos_ghc
++WHERE fonte_dado = 'censo_diario'
++  AND data_snapshot IS NULL;
++
++-- 6. Duplicidades lógicas por hash, útil caso a UNIQUE constraint não esteja aplicada no ambiente.
++SELECT
++  fonte_dado,
++  hash_registro,
++  COUNT(*) AS ocorrencias
++FROM ocupacao_leitos_ghc
++GROUP BY fonte_dado, hash_registro
++HAVING COUNT(*) > 1
++ORDER BY ocorrencias DESC
++LIMIT 100;
++
++-- 7. KPIs-base para comparar com GET /api/censo/kpis.
++SELECT
++  COUNT(*) AS total_internados,
++  SUM(CASE WHEN dias_internacao >= 15 THEN 1 ELSE 0 END) AS longa_permanencia_15,
++  SUM(CASE WHEN dias_internacao >= 30 THEN 1 ELSE 0 END) AS longa_permanencia_30
++FROM ocupacao_leitos_ghc
++WHERE data_alta IS NULL;
++
++-- 8. Distribuição de internados ativos por unidade/especialidade.
++SELECT
++  unidade,
++  especialidade,
++  COUNT(*) AS total_internados
++FROM ocupacao_leitos_ghc
++WHERE data_alta IS NULL
++GROUP BY unidade, especialidade
++ORDER BY total_internados DESC, unidade, especialidade;
+diff --git a/tests/test_etl_process.py b/tests/test_etl_process.py
+index 04fe421..a434fe7 100644
+--- a/tests/test_etl_process.py
++++ b/tests/test_etl_process.py
+@@ -1,8 +1,14 @@
+-from pathlib import Path
+-
+ import pandas as pd
+ 
+-from src.etl.etl_process import build_hash_registro, clean_int, normalize_censo, normalize_historico, parse_dias_internacao
++from src.etl.etl_process import (
++    _sanitize_record_for_sql,
++    build_hash_registro,
++    clean_int,
++    normalize_censo,
++    normalize_historico,
++    parse_dias_internacao,
++    prepare_dataframe,
++)
+ 
+ 
+ def test_clean_int_extracts_digits():
+@@ -80,3 +86,42 @@ def test_normalize_censo_maps_core_columns():
+     assert out.loc[0, "idade_anos"] == 65
+     assert out.loc[0, "data_snapshot"] == pd.Timestamp("2026-06-25").date()
+     assert out.loc[0, "fonte_dado"] == "censo_diario"
++
++
++def test_sanitize_record_for_sql_converts_pandas_nulls_and_timestamps():
++    record = {
++        "data_alta": pd.NaT,
++        "idade_anos": pd.NA,
++        "dias_internacao": float("nan"),
++        "data_internacao": pd.Timestamp("2026-06-20 08:30"),
++        "prontuario": "8429393",
++    }
++
++    sanitized = _sanitize_record_for_sql(record)
++
++    assert sanitized["data_alta"] is None
++    assert sanitized["idade_anos"] is None
++    assert sanitized["dias_internacao"] is None
++    assert sanitized["data_internacao"].isoformat() == "2026-06-20T08:30:00"
++    assert sanitized["prontuario"] == "8429393"
++
++
++def test_prepare_dataframe_detects_csv_with_metadata_header(tmp_path):
++    csv_path = tmp_path / "censo-com-metadados.csv"
++    csv_path.write_text(
++        "Relatorio exportado pelo esusreport\n"
++        "Data Impressao: 25/06/2026 07:57\n"
++        "STATUS LEITO,PRONT,NOME,IDADE (a),IDADE (m),DATA INTERNACAO,"
++        "CLINICA RESPONSAVEL (FORA DE CLINICA),UNIDADE,ENFERMARIA,LEITO,CID,CID DESCRICAO,DIAS INTER.\n"
++        "OCUPADO,8429393,CLEA COSTA MATIAS,65,9,20/06/2026,MEDICINA INTENSIVA,"
++        "PREDIO 1,GHC P1 1A,117.01,R229,TUMEFACAO,5\n",
++        encoding="utf-8",
++    )
++
++    out = prepare_dataframe(csv_path, lote_importacao_id="lote-censo")
++
++    assert len(out) == 1
++    assert out.loc[0, "fonte_dado"] == "censo_diario"
++    assert out.loc[0, "prontuario"] == "8429393"
++    assert out.loc[0, "data_snapshot"] == pd.Timestamp("2026-06-25").date()
++    assert out.loc[0, "lote_importacao_id"] == "lote-censo"
+-- 
+2.43.0

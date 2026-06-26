@@ -101,3 +101,110 @@ def upload_page() -> str:
 </body>
 </html>
 """
+
+
+def dashboard_page() -> str:
+    return """
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EGAA - Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f5f7fa; margin: 0; padding: 24px; }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    .header { display:flex; align-items:center; justify-content:space-between; }
+    h1 { color:#003d66; margin:0; }
+    .cards { display:flex; gap:12px; margin-top:16px; }
+    .card { background:#fff; padding:12px 16px; border-radius:10px; box-shadow:0 1px 2px rgba(16,24,40,0.05); min-width:160px }
+    table { width:100%; border-collapse:collapse; margin-top:12px; background:#fff; }
+    th, td { padding:8px 10px; border-bottom:1px solid #eee; text-align:left }
+    .controls { margin-top:12px; display:flex; gap:8px; align-items:center }
+    input, select, button { padding:8px 10px; border-radius:8px; border:1px solid #cfd8e3 }
+    button { background:#005c99; color:#fff; cursor:pointer; border:none }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <h1>EGAA - Dashboard</h1>
+      <a href="/upload">Ir para Upload</a>
+    </div>
+
+    <div class="cards" id="kpis">
+      <div class="card">Carregando...</div>
+    </div>
+
+    <div class="controls">
+      <label>Especialidade: <input id="especialidade" placeholder="ex: DERMATO" /></label>
+      <label>Unidade: <input id="unidade" placeholder="ex: HFB" /></label>
+      <button id="filtrar">Filtrar</button>
+    </div>
+
+    <table aria-live="polite">
+      <thead>
+        <tr><th>Prontuario</th><th>Nome</th><th>Idade</th><th>Dias</th><th>Especialidade</th><th>Unidade</th></tr>
+      </thead>
+      <tbody id="rows">
+      </tbody>
+    </table>
+
+    <div style="margin-top:12px; display:flex; gap:8px; align-items:center">
+      <button id="prev">Anterior</button>
+      <span id="pageInfo">Página 1</span>
+      <button id="next">Próxima</button>
+    </div>
+  </div>
+
+  <script>
+    const kpisEl = document.getElementById('kpis');
+    const rowsEl = document.getElementById('rows');
+    const especialidadeEl = document.getElementById('especialidade');
+    const unidadeEl = document.getElementById('unidade');
+    const filtrarBtn = document.getElementById('filtrar');
+    const prevBtn = document.getElementById('prev');
+    const nextBtn = document.getElementById('next');
+    const pageInfo = document.getElementById('pageInfo');
+
+    let page = 1; const pageSize = 10;
+
+    async function loadKPIs() {
+      const res = await fetch('/censo/kpis');
+      if (!res.ok) return kpisEl.innerHTML = '<div class="card">Erro ao obter KPIs</div>';
+      const data = await res.json();
+      kpisEl.innerHTML = `
+        <div class="card"><strong>Internados</strong><div style="font-size:22px">${data.total_internados}</div></div>
+        <div class="card"><strong>>=15 dias</strong><div style="font-size:22px">${data.longa_permanencia_15}</div></div>
+        <div class="card"><strong>>=30 dias</strong><div style="font-size:22px">${data.longa_permanencia_30}</div></div>
+        <div class="card"><strong>Por unidade</strong><div>${data.ocupacao_por_unidade.map(u => `<div>${u.unidade||'--'}: ${u.total_pacientes}</div>`).join('')}</div></div>`;
+    }
+
+    async function loadPacientes() {
+      const params = new URLSearchParams();
+      params.set('page', page);
+      params.set('page_size', pageSize);
+      if (especialidadeEl.value) params.set('especialidade', especialidadeEl.value);
+      if (unidadeEl.value) params.set('unidade', unidadeEl.value);
+
+      const res = await fetch('/censo/pacientes?' + params.toString());
+      if (!res.ok) return rowsEl.innerHTML = `<tr><td colspan="6">Erro ao obter pacientes (${res.status})</td></tr>`;
+      const data = await res.json();
+      rowsEl.innerHTML = data.items.map(it => `<tr><td>${it.prontuario}</td><td>${it.nome_paciente||''}</td><td>${it.idade_anos??''}</td><td>${it.dias_internacao??''}</td><td>${it.especialidade}</td><td>${it.unidade||''}</td></tr>`).join('');
+      pageInfo.textContent = `Página ${data.page} de ${Math.ceil(data.total / data.page_size) || 1}`;
+      prevBtn.disabled = data.page <= 1; nextBtn.disabled = data.page * data.page_size >= data.total;
+    }
+
+    filtrarBtn.addEventListener('click', () => { page = 1; loadPacientes(); loadKPIs(); });
+    prevBtn.addEventListener('click', () => { if (page>1) page--; loadPacientes(); });
+    nextBtn.addEventListener('click', () => { page++; loadPacientes(); });
+
+    loadKPIs(); loadPacientes();
+  </script>
+</body>
+</html>
+"""
+
+@router.get("/dashboard", response_class=HTMLResponse)
+def dashboard_route() -> str:
+    return dashboard_page()
