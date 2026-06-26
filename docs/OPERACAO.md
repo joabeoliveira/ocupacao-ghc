@@ -35,10 +35,26 @@ Critérios mínimos de aceite:
 
 - `/health` retorna HTTP 200.
 - `/api/censo/kpis` retorna totais coerentes com a auditoria SQL.
-- `/api/censo/pacientes` pagina resultados e permite filtros por `especialidade` e `unidade`.
+- `/api/censo/pacientes` pagina resultados e permite filtros por `especialidade`, `unidade`, `data_inicio`, `data_fim` e `min_dias`.
 - A tela `/upload` continua disponível para novas cargas operacionais.
 
-## 4. Validação automatizada local
+## 4. Fluxo da interface
+
+As rotas principais da interface web são:
+
+- `/dashboard` ou `/` redirecionado para `dashboard`
+- `/pacientes` para a lista filtrável de internações
+- `/longa-permanencia` para foco em pacientes com `15+` dias
+- `/upload` para envio manual de arquivos
+
+Uso recomendado:
+
+1. Abrir `/dashboard` para a leitura executiva inicial.
+2. Usar os filtros do topo para recorte por especialidade, unidade e período.
+3. Abrir `/longa-permanencia` quando a prioridade for atuação sobre internações prolongadas.
+4. Abrir `/pacientes` quando a prioridade for investigação de casos individuais.
+
+## 5. Validação automatizada local
 
 Antes de publicar alterações, rode:
 
@@ -49,16 +65,17 @@ pytest -q
 
 Esses checks protegem principalmente parsing, normalização, geração de hash e sanitização de valores pandas nulos antes do upsert no MySQL.
 
-## 5. Checklist pós-deploy no Easypanel
+## 6. Checklist pós-deploy no Easypanel
 
 1. Confirmar variáveis de ambiente do MySQL no painel.
 2. Verificar logs do contêiner após o build.
 3. Acessar `GET /health`.
 4. Comparar `GET /api/censo/kpis` com a seção de KPIs do script de auditoria.
-5. Abrir `/upload` e testar um upload pequeno de censo, se aplicável.
-6. Revisar se novos uploads não criam duplicidades inesperadas.
+5. Abrir `/dashboard`, `/pacientes` e `/longa-permanencia` para confirmar navegação e filtros.
+6. Abrir `/upload` e testar um upload pequeno de censo, se aplicável.
+7. Revisar se novos uploads não criam duplicidades inesperadas.
 
-## 6. Critério de conclusão
+## 7. Critério de conclusão
 
 Considere o MVP concluído quando:
 
@@ -67,3 +84,4 @@ Considere o MVP concluído quando:
 - API responde com dados coerentes do banco populado.
 - Deploy está documentado e reproduzível.
 - O fluxo de upload diário está validado para uso operacional.
+- As rotas `/dashboard`, `/pacientes`, `/longa-permanencia` e `/upload` estão funcionais e alinhadas ao design-system.

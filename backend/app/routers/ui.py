@@ -552,6 +552,16 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
     default_min_dias_value = "" if default_min_dias is None else str(default_min_dias)
     badge_text = "Longa permanência" if default_min_dias is not None else "Lista geral"
     badge_class = "badge-warning" if default_min_dias is not None else "badge-info"
+    nav_items = [
+        ("Dashboard", "/dashboard", title == "Dashboard"),
+        ("Pacientes", "/pacientes", title == "Pacientes"),
+        ("Longa Permanência", "/longa-permanencia", title == "Longa Permanência"),
+        ("Importações", "/upload", False),
+    ]
+    nav_html = "".join(
+        '<a href="{0}"{1}>{2}</a>'.format(href, " class='primary'" if active else "", label)
+        for label, href, active in nav_items
+    )
     return f"""
 <!doctype html>
 <html lang="pt-BR">
@@ -731,9 +741,7 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
       <p class="brand">EGAA</p>
       <p class="brand-subtitle">Painel de regulação e censo</p>
       <nav class="nav">
-        <a href="/dashboard">Dashboard</a>
-        <a class="primary" href="{('/longa-permanencia' if default_min_dias is not None else '/pacientes')}">{title}</a>
-        <a href="/upload">Importações</a>
+        {nav_html}
       </nav>
       <div class="sidebar-note">
         {subtitle}
@@ -818,6 +826,8 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
   </div>
   <script>
     const API_PREFIX = '/api';
+    const isLongaPermanencia = {str(default_min_dias is not None).lower()};
+    const diasMinimos = {('null' if default_min_dias is None else default_min_dias)};
     const kpisEl = document.getElementById('kpis');
     const rowsEl = document.getElementById('rows');
     const especialidadeEl = document.getElementById('especialidade');
@@ -849,10 +859,24 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
       }}
       const data = await res.json();
       const items = Array.isArray(data.items) ? data.items : [];
+      const diasMaximos = items.reduce((max, item) => Math.max(max, Number(item.dias_internacao || 0)), 0);
+      const mediaDias = items.length
+        ? Math.round(items.reduce((sum, item) => sum + Number(item.dias_internacao || 0), 0) / items.length)
+        : 0;
+      const unidadeLider = items.reduce((acc, item) => {{
+        const unidade = item.unidade || '--';
+        acc[unidade] = (acc[unidade] || 0) + 1;
+        return acc;
+      }}, {{}});
+      const unidadeLiderNome = Object.entries(unidadeLider).sort((a, b) => b[1] - a[1])[0]?.[0] || '--';
+      const unidadeLiderTotal = Object.entries(unidadeLider).sort((a, b) => b[1] - a[1])[0]?.[1] || 0;
       kpisEl.innerHTML = `
         <div class="card"><span class="badge {badge_class}">{badge_text}</span><strong>Total encontrado</strong><div class="kpi-value">${{data.total}}</div></div>
         <div class="card"><span class="badge badge-info">Página atual</span><strong>Paginação</strong><div class="kpi-value">${{data.page}}</div></div>
         <div class="card"><span class="badge badge-secondary">Lote visual</span><strong>Itens por página</strong><div class="kpi-value">${{data.page_size}}</div></div>
+        ${{isLongaPermanencia ? `<div class="card"><span class="badge badge-warning">Longa permanência</span><strong>Dias mínimos</strong><div class="kpi-value">${{diasMinimos}}</div></div>` : ''}}
+        ${{isLongaPermanencia ? `<div class="card"><span class="badge badge-warning">Acompanhamento</span><strong>Média na página</strong><div class="kpi-value">${{mediaDias}}d</div></div>` : ''}}
+        ${{isLongaPermanencia ? `<div class="card"><span class="badge badge-warning">Maior permanência</span><strong>Maior valor</strong><div class="kpi-value">${{diasMaximos}}d</div><div class="muted" style="margin-top:6px">${{unidadeLiderNome}} (${{unidadeLiderTotal}} registros)</div></div>` : ''}}
       `;
       rowsEl.innerHTML = items.length
         ? items.map(it => `<tr><td>${{it.prontuario}}</td><td>${{it.nome_paciente||''}}</td><td>${{it.idade_anos??''}}</td><td>${{it.dias_internacao??''}}</td><td>${{it.especialidade}}</td><td>${{it.unidade||''}}</td></tr>`).join('')
