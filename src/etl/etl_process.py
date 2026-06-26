@@ -270,9 +270,42 @@ def normalize_historico(df: pd.DataFrame, metadata: dict[str, Any], lote_importa
         ),
         axis=1,
     )
+    # recalcula dias_internacao de forma robusta (evita valores absurdos)
+    normalized = _recalculate_dias(normalized)
+
     for column in ["idade_anos", "idade_meses", "dias_internacao"]:
         normalized[column] = pd.array(normalized[column], dtype="Int64")
     return normalized
+
+
+def _recalculate_dias(df: pd.DataFrame) -> pd.DataFrame:
+    # Garante datetimes e calcula dias_internacao de forma robusta
+    if "data_internacao" in df.columns:
+        df["data_internacao"] = pd.to_datetime(df["data_internacao"], errors="coerce")
+    else:
+        df["data_internacao"] = pd.NaT
+
+    if "data_alta" in df.columns:
+        df["data_alta"] = pd.to_datetime(df["data_alta"], errors="coerce")
+    else:
+        df["data_alta"] = pd.NaT
+
+    today = pd.to_datetime("today").normalize()
+
+    # Para registros com data_internacao presente e sem data_alta: diferença até hoje
+    mask_internado = df["data_internacao"].notna() & df["data_alta"].isna()
+    if mask_internado.any():
+        df.loc[mask_internado, "dias_internacao"] = (today - df.loc[mask_internado, "data_internacao"]).dt.days
+
+    # Para registros com data_internacao e data_alta: diferença entre datas
+    mask_alta = df["data_internacao"].notna() & df["data_alta"].notna()
+    if mask_alta.any():
+        df.loc[mask_alta, "dias_internacao"] = (df.loc[mask_alta, "data_alta"] - df.loc[mask_alta, "data_internacao"]).dt.days
+
+    # Força tipo inteiro e remove valores negativos
+    df["dias_internacao"] = pd.to_numeric(df["dias_internacao"], errors="coerce")
+    df.loc[df["dias_internacao"] < 0, "dias_internacao"] = 0
+    return df
 
 
 def normalize_censo(df: pd.DataFrame, metadata: dict[str, Any], lote_importacao_id: str) -> pd.DataFrame:
@@ -321,6 +354,12 @@ def normalize_censo(df: pd.DataFrame, metadata: dict[str, Any], lote_importacao_
         ),
         axis=1,
     )
+    for column in ["idade_anos", "idade_meses", "dias_internacao"]:
+        normalized[column] = pd.array(normalized[column], dtype="Int64")
+
+    # recalcula dias_internacao para garantir consistencia
+    normalized = _recalculate_dias(normalized)
+
     for column in ["idade_anos", "idade_meses", "dias_internacao"]:
         normalized[column] = pd.array(normalized[column], dtype="Int64")
     return normalized
