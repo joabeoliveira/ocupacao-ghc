@@ -411,30 +411,44 @@ def persist_dataframe(df: pd.DataFrame, engine) -> int:
         LOGGER.warning("Nenhuma linha valida para persistir apos higienizacao.")
         return 0
 
+    total_affected = 0
+    batch_size = int(os.getenv("ETL_BATCH_SIZE", "1000"))
+
     with engine.begin() as connection:
-        statement = mysql_insert(table).values(records)
-        upsert = statement.on_duplicate_key_update(
-            nome_paciente=statement.inserted.nome_paciente,
-            idade_anos=statement.inserted.idade_anos,
-            idade_meses=statement.inserted.idade_meses,
-            data_alta=statement.inserted.data_alta,
-            dias_internacao=statement.inserted.dias_internacao,
-            especialidade=statement.inserted.especialidade,
-            unidade=statement.inserted.unidade,
-            enfermaria=statement.inserted.enfermaria,
-            leito=statement.inserted.leito,
-            cid_internacao_codigo=statement.inserted.cid_internacao_codigo,
-            cid_internacao_descricao=statement.inserted.cid_internacao_descricao,
-            tipo_alta=statement.inserted.tipo_alta,
-            data_snapshot=statement.inserted.data_snapshot,
-            periodo_referencia_inicio=statement.inserted.periodo_referencia_inicio,
-            periodo_referencia_fim=statement.inserted.periodo_referencia_fim,
-            data_impressao_arquivo=statement.inserted.data_impressao_arquivo,
-            lote_importacao_id=statement.inserted.lote_importacao_id,
-            nome_arquivo=statement.inserted.nome_arquivo,
-        )
-        result = connection.execute(upsert)
-    return result.rowcount or 0
+        for start in range(0, len(records), batch_size):
+            batch = records[start : start + batch_size]
+            statement = mysql_insert(table).values(batch)
+            upsert = statement.on_duplicate_key_update(
+                nome_paciente=statement.inserted.nome_paciente,
+                idade_anos=statement.inserted.idade_anos,
+                idade_meses=statement.inserted.idade_meses,
+                data_alta=statement.inserted.data_alta,
+                dias_internacao=statement.inserted.dias_internacao,
+                especialidade=statement.inserted.especialidade,
+                unidade=statement.inserted.unidade,
+                enfermaria=statement.inserted.enfermaria,
+                leito=statement.inserted.leito,
+                cid_internacao_codigo=statement.inserted.cid_internacao_codigo,
+                cid_internacao_descricao=statement.inserted.cid_internacao_descricao,
+                tipo_alta=statement.inserted.tipo_alta,
+                data_snapshot=statement.inserted.data_snapshot,
+                periodo_referencia_inicio=statement.inserted.periodo_referencia_inicio,
+                periodo_referencia_fim=statement.inserted.periodo_referencia_fim,
+                data_impressao_arquivo=statement.inserted.data_impressao_arquivo,
+                lote_importacao_id=statement.inserted.lote_importacao_id,
+                nome_arquivo=statement.inserted.nome_arquivo,
+            )
+            result = connection.execute(upsert)
+            affected = result.rowcount or 0
+            total_affected += affected
+            LOGGER.info(
+                "Persistencia em lote: inicio=%s tamanho=%s afetadas=%s",
+                start,
+                len(batch),
+                affected,
+            )
+
+    return total_affected
 
 
 def process_file(path: Path, persist: bool = False, lote_importacao_id: str | None = None) -> pd.DataFrame:
