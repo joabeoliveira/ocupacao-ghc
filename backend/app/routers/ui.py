@@ -167,6 +167,7 @@ def dashboard_page() -> str:
   </div>
 
   <script>
+    const API_PREFIX = '/api';
     const kpisEl = document.getElementById('kpis');
     const rowsEl = document.getElementById('rows');
     const especialidadeEl = document.getElementById('especialidade');
@@ -179,7 +180,7 @@ def dashboard_page() -> str:
     let page = 1; let pageSize = parseInt(document.getElementById('pageSizeSelect').value, 10) || 10;
 
     async function loadKPIs() {
-      const res = await fetch('/censo/kpis');
+      const res = await fetch(`${API_PREFIX}/censo/kpis`);
       if (!res.ok) return kpisEl.innerHTML = '<div class="card">Erro ao obter KPIs</div>';
       const data = await res.json();
       kpisEl.innerHTML = `
@@ -196,7 +197,7 @@ def dashboard_page() -> str:
       if (especialidadeEl.value) params.set('especialidade', especialidadeEl.value);
       if (unidadeEl.value) params.set('unidade', unidadeEl.value);
 
-      const res = await fetch('/censo/pacientes?' + params.toString());
+      const res = await fetch(`${API_PREFIX}/censo/pacientes?` + params.toString());
       if (!res.ok) return rowsEl.innerHTML = `<tr><td colspan="6">Erro ao obter pacientes (${res.status})</td></tr>`;
       const data = await res.json();
       rowsEl.innerHTML = data.items.map(it => `<tr><td>${it.prontuario}</td><td>${it.nome_paciente||''}</td><td>${it.idade_anos??''}</td><td>${it.dias_internacao??''}</td><td>${it.especialidade}</td><td>${it.unidade||''}</td></tr>`).join('');

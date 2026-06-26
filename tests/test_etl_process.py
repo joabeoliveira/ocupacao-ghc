@@ -88,6 +88,37 @@ def test_normalize_censo_maps_core_columns():
     assert out.loc[0, "fonte_dado"] == "censo_diario"
 
 
+def test_normalize_censo_recalculates_dias_internacao_for_active_patient():
+    today = pd.Timestamp.today().normalize()
+    data_internacao = today - pd.Timedelta(days=6)
+
+    df = pd.DataFrame(
+        {
+            "PRONT": ["8429393"],
+            "NOME": ["CLEA COSTA MATIAS"],
+            "IDADE (a)": [65],
+            "IDADE (m)": [9],
+            "DATA INTERNACAO": [data_internacao.strftime("%d/%m/%Y")],
+            "CLINICA RESPONSAVEL (FORA DE CLINICA)": ["MEDICINA INTENSIVA"],
+            "UNIDADE": ["PREDIO 1"],
+            "ENFERMARIA": ["GHC P1 1A"],
+            "LEITO": ["117.01"],
+            "CID": ["R229"],
+            "CID DESCRICAO": ["TUMEFACAO"],
+            "DIAS INTER.": [5],
+        }
+    )
+    metadata = {
+        "nome_arquivo": "censo.xls",
+        "data_impressao_arquivo": today,
+    }
+
+    out = normalize_censo(df, metadata, "lote-3")
+
+    assert out.loc[0, "data_alta"] is None
+    assert out.loc[0, "dias_internacao"] == 6
+
+
 def test_sanitize_record_for_sql_converts_pandas_nulls_and_timestamps():
     record = {
         "data_alta": pd.NaT,
