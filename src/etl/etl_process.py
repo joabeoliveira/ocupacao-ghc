@@ -378,10 +378,37 @@ def get_ocupacao_table_definition(metadata: MetaData) -> Table:
 
 
 def persist_dataframe(df: pd.DataFrame, engine) -> int:
+    # Higienizacao final para evitar erros de NOT NULL por linhas incompletas do arquivo.
+    work = df.copy()
+    initial_len = len(work)
+
+    work["prontuario"] = work["prontuario"].apply(clean_string)
+    work["especialidade"] = work["especialidade"].apply(clean_string)
+    work["fonte_dado"] = work["fonte_dado"].apply(clean_string)
+    work["lote_importacao_id"] = work["lote_importacao_id"].apply(clean_string)
+    work["nome_arquivo"] = work["nome_arquivo"].apply(clean_string)
+    work["hash_registro"] = work["hash_registro"].apply(clean_string)
+
+    work["especialidade"] = work["especialidade"].fillna("NAO INFORMADA")
+
+    required_mask = (
+        work["prontuario"].notna()
+        & work["especialidade"].notna()
+        & work["fonte_dado"].notna()
+        & work["lote_importacao_id"].notna()
+        & work["nome_arquivo"].notna()
+        & work["hash_registro"].notna()
+    )
+    work = work.loc[required_mask].copy()
+    dropped = initial_len - len(work)
+    if dropped > 0:
+        LOGGER.warning("Descartadas %s linhas invalidas antes da persistencia (campos obrigatorios ausentes).", dropped)
+
     metadata = MetaData()
     table = get_ocupacao_table_definition(metadata)
-    records = df.where(pd.notna(df), None).to_dict(orient="records")
+    records = work.where(pd.notna(work), None).to_dict(orient="records")
     if not records:
+        LOGGER.warning("Nenhuma linha valida para persistir apos higienizacao.")
         return 0
 
     with engine.begin() as connection:

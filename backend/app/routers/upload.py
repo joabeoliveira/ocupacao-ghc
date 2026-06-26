@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import tempfile
 import uuid
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
@@ -14,6 +15,7 @@ from etl_process import process_file, processar_censo_diario, processar_historic
 
 router = APIRouter(prefix="/upload", tags=["Upload"])
 ALLOWED_SUFFIXES = {".xls", ".xlsx", ".csv"}
+LOGGER = logging.getLogger(__name__)
 
 
 def _ensure_supported_file(file: UploadFile) -> str:
@@ -46,6 +48,7 @@ async def upload_censo(file: UploadFile = File(...)) -> UploadCensoResponse:
             linhas_processadas=len(df),
         )
     except Exception as exc:
+        LOGGER.exception("Falha no upload de censo. arquivo=%s lote=%s", file.filename, lote_importacao_id)
         raise HTTPException(status_code=500, detail=f"Falha ao processar arquivo de censo: {exc}") from exc
     finally:
         tmp_path.unlink(missing_ok=True)
@@ -66,6 +69,7 @@ async def upload_historico(file: UploadFile = File(...)) -> UploadCensoResponse:
             linhas_processadas=len(df),
         )
     except Exception as exc:
+        LOGGER.exception("Falha no upload historico. arquivo=%s lote=%s", file.filename, lote_importacao_id)
         raise HTTPException(status_code=500, detail=f"Falha ao processar arquivo historico: {exc}") from exc
     finally:
         tmp_path.unlink(missing_ok=True)
@@ -87,6 +91,7 @@ async def upload_arquivo_auto(file: UploadFile = File(...)) -> UploadCensoRespon
             linhas_processadas=len(df),
         )
     except Exception as exc:
+        LOGGER.exception("Falha no upload automatico. arquivo=%s lote=%s", file.filename, lote_importacao_id)
         raise HTTPException(status_code=500, detail=f"Falha ao processar arquivo (auto): {exc}") from exc
     finally:
         tmp_path.unlink(missing_ok=True)
