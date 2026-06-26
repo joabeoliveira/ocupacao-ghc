@@ -153,6 +153,32 @@ def make_unique_headers(headers: list[str]) -> list[str]:
     return unique_headers
 
 
+def _build_column_alias_map(df: pd.DataFrame) -> dict[str, str]:
+    alias_map: dict[str, str] = {}
+    for column in df.columns:
+        key = normalize_token(column)
+        if key and key not in alias_map:
+            alias_map[key] = column
+    return alias_map
+
+
+def _get_series_by_alias(
+    df: pd.DataFrame,
+    alias_map: dict[str, str],
+    aliases: list[str],
+    *,
+    required: bool = False,
+    default: Any = None,
+) -> pd.Series:
+    for alias in aliases:
+        key = normalize_token(alias)
+        if key in alias_map:
+            return df[alias_map[key]]
+    if required:
+        raise KeyError(f"Coluna obrigatoria ausente. Esperado uma das: {aliases}")
+    return pd.Series([default] * len(df), index=df.index)
+
+
 def extract_metadata_and_table(path: Path) -> tuple[dict[str, Any], pd.DataFrame]:
     raw = read_input_file(path)
     metadata: dict[str, Any] = {
@@ -175,14 +201,19 @@ def extract_metadata_and_table(path: Path) -> tuple[dict[str, Any], pd.DataFrame
             _, _, date_text = first.partition(":")
             metadata["data_impressao_arquivo"] = parse_datetime_br(date_text.strip())
 
-        if values and any(value in {"DATA_INTERNACAO", "DATA INTERNACAO"} for value in normalized_values):
+        if values and any(value == "STATUS LEITO" for value in normalized_values):
+            header_index = index
+            metadata["tipo_arquivo_detectado"] = "censo_diario"
+            break
+
+        if values and any(value in {"PRONTUARIO", "TIPO_DE_ALTA", "TEMPO_INTERNACAO"} for value in normalized_values):
             header_index = index
             metadata["tipo_arquivo_detectado"] = "historico_internacao"
             break
 
-        if values and any(value == "STATUS LEITO" for value in normalized_values):
+        if values and any(value in {"DATA_INTERNACAO", "DATA INTERNACAO"} for value in normalized_values):
             header_index = index
-            metadata["tipo_arquivo_detectado"] = "censo_diario"
+            metadata["tipo_arquivo_detectado"] = "historico_internacao"
             break
 
     if header_index is None:
@@ -198,21 +229,27 @@ def extract_metadata_and_table(path: Path) -> tuple[dict[str, Any], pd.DataFrame
 
 
 def normalize_historico(df: pd.DataFrame, metadata: dict[str, Any], lote_importacao_id: str) -> pd.DataFrame:
+    alias_map = _build_column_alias_map(df)
     normalized = pd.DataFrame()
-    normalized["prontuario"] = df["PRONTUARIO"].apply(clean_string)
-    normalized["nome_paciente"] = df["NOME"].apply(clean_string)
-    normalized["idade_anos"] = df["IDADE_ANOS"].apply(clean_int)
-    normalized["idade_meses"] = df["IDADE_MES"].apply(clean_int)
-    normalized["data_internacao"] = df["DATA_INTERNACAO"].apply(parse_datetime_br)
-    normalized["data_alta"] = df["DATA_ALTA"].apply(parse_datetime_br)
-    normalized["especialidade"] = df["ESPECIALIDADE"].apply(clean_string)
-    normalized["unidade"] = df["UNIDADE"].apply(clean_string)
-    normalized["enfermaria"] = df["ENFERMARIA"].apply(clean_string)
-    normalized["leito"] = df["LEITO"].apply(clean_string)
-    normalized["cid_internacao_codigo"] = df["CID_INTERNACAO"].apply(clean_string)
-    normalized["cid_internacao_descricao"] = df["CID_DESCRICAO"].apply(clean_string)
-    normalized["tipo_alta"] = df["TIPO_DE_ALTA"].apply(clean_string)
-    normalized["dias_internacao"] = df["TEMPO_INTERNACAO"].apply(parse_dias_internacao)
+    normalized["prontuario"] = _get_series_by_alias(df, alias_map, ["PRONTUARIO", "PRONT"], required=True).apply(clean_string)
+    normalized["nome_paciente"] = _get_series_by_alias(df, alias_map, ["NOME"], required=True).apply(clean_string)
+    normalized["idade_anos"] = _get_series_by_alias(df, alias_map, ["IDADE_ANOS", "IDADE (a)"]).apply(clean_int)
+    normalized["idade_meses"] = _get_series_by_alias(df, alias_map, ["IDADE_MES", "IDADE (m)"]).apply(clean_int)
+    normalized["data_internacao"] = _get_series_by_alias(df, alias_map, ["DATA_INTERNACAO", "DATA INTERNACAO"], required=True).apply(parse_datetime_br)
+    normalized["data_alta"] = _get_series_by_alias(df, alias_map, ["DATA_ALTA"]).apply(parse_datetime_br)
+    normalized["especialidade"] = _get_series_by_alias(
+        df,
+        alias_map,
+        ["ESPECIALIDADE", "CLINICA RESPONSAVEL (FORA DE CLINICA)"],
+        required=True,
+    ).apply(clean_string)
+    normalized["unidade"] = _get_series_by_alias(df, alias_map, ["UNIDADE"]).apply(clean_string)
+    normalized["enfermaria"] = _get_series_by_alias(df, alias_map, ["ENFERMARIA"]).apply(clean_string)
+    normalized["leito"] = _get_series_by_alias(df, alias_map, ["LEITO"]).apply(clean_string)
+    normalized["cid_internacao_codigo"] = _get_series_by_alias(df, alias_map, ["CID_INTERNACAO", "CID"]).apply(clean_string)
+    normalized["cid_internacao_descricao"] = _get_series_by_alias(df, alias_map, ["CID_DESCRICAO", "CID DESCRICAO"]).apply(clean_string)
+    normalized["tipo_alta"] = _get_series_by_alias(df, alias_map, ["TIPO_DE_ALTA"]).apply(clean_string)
+    normalized["dias_internacao"] = _get_series_by_alias(df, alias_map, ["TEMPO_INTERNACAO", "DIAS INTER."]).apply(parse_dias_internacao)
     normalized["fonte_dado"] = "historico_internacao"
     normalized["lote_importacao_id"] = lote_importacao_id
     normalized["nome_arquivo"] = metadata["nome_arquivo"]
@@ -239,21 +276,27 @@ def normalize_historico(df: pd.DataFrame, metadata: dict[str, Any], lote_importa
 
 
 def normalize_censo(df: pd.DataFrame, metadata: dict[str, Any], lote_importacao_id: str) -> pd.DataFrame:
+    alias_map = _build_column_alias_map(df)
     normalized = pd.DataFrame()
-    normalized["prontuario"] = df["PRONT"].apply(clean_string)
-    normalized["nome_paciente"] = df["NOME"].apply(clean_string)
-    normalized["idade_anos"] = df["IDADE (a)"].apply(clean_int)
-    normalized["idade_meses"] = df["IDADE (m)"].apply(clean_int)
-    normalized["data_internacao"] = df["DATA INTERNACAO"].apply(parse_datetime_br)
+    normalized["prontuario"] = _get_series_by_alias(df, alias_map, ["PRONT", "PRONTUARIO"], required=True).apply(clean_string)
+    normalized["nome_paciente"] = _get_series_by_alias(df, alias_map, ["NOME"], required=True).apply(clean_string)
+    normalized["idade_anos"] = _get_series_by_alias(df, alias_map, ["IDADE (a)", "IDADE_ANOS"]).apply(clean_int)
+    normalized["idade_meses"] = _get_series_by_alias(df, alias_map, ["IDADE (m)", "IDADE_MES"]).apply(clean_int)
+    normalized["data_internacao"] = _get_series_by_alias(df, alias_map, ["DATA INTERNACAO", "DATA_INTERNACAO"], required=True).apply(parse_datetime_br)
     normalized["data_alta"] = None
-    normalized["especialidade"] = df["CLINICA RESPONSAVEL (FORA DE CLINICA)"].apply(clean_string)
-    normalized["unidade"] = df["UNIDADE"].apply(clean_string)
-    normalized["enfermaria"] = df["ENFERMARIA"].apply(clean_string)
-    normalized["leito"] = df["LEITO"].apply(clean_string)
-    normalized["cid_internacao_codigo"] = df["CID"].apply(clean_string)
-    normalized["cid_internacao_descricao"] = df["CID DESCRICAO"].apply(clean_string)
+    normalized["especialidade"] = _get_series_by_alias(
+        df,
+        alias_map,
+        ["CLINICA RESPONSAVEL (FORA DE CLINICA)", "ESPECIALIDADE"],
+        required=True,
+    ).apply(clean_string)
+    normalized["unidade"] = _get_series_by_alias(df, alias_map, ["UNIDADE"]).apply(clean_string)
+    normalized["enfermaria"] = _get_series_by_alias(df, alias_map, ["ENFERMARIA"]).apply(clean_string)
+    normalized["leito"] = _get_series_by_alias(df, alias_map, ["LEITO"]).apply(clean_string)
+    normalized["cid_internacao_codigo"] = _get_series_by_alias(df, alias_map, ["CID", "CID_INTERNACAO"]).apply(clean_string)
+    normalized["cid_internacao_descricao"] = _get_series_by_alias(df, alias_map, ["CID DESCRICAO", "CID_DESCRICAO"]).apply(clean_string)
     normalized["tipo_alta"] = None
-    normalized["dias_internacao"] = df["DIAS INTER."].apply(clean_int)
+    normalized["dias_internacao"] = _get_series_by_alias(df, alias_map, ["DIAS INTER.", "TEMPO_INTERNACAO"]).apply(clean_int)
     normalized["fonte_dado"] = "censo_diario"
     normalized["lote_importacao_id"] = lote_importacao_id
     normalized["nome_arquivo"] = metadata["nome_arquivo"]
