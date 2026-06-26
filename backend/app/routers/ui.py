@@ -139,7 +139,16 @@ def dashboard_page() -> str:
     <div class="controls">
       <label>Especialidade: <input id="especialidade" placeholder="ex: DERMATO" /></label>
       <label>Unidade: <input id="unidade" placeholder="ex: HFB" /></label>
+      <label>Itens por página: 
+        <select id="pageSizeSelect">
+          <option value="5">5</option>
+          <option value="10" selected>10</option>
+          <option value="20">20</option>
+          <option value="50">50</option>
+        </select>
+      </label>
       <button id="filtrar">Filtrar</button>
+      <button id="refresh" style="background:#00994d;margin-left:8px">Recarregar</button>
     </div>
 
     <table aria-live="polite">
@@ -167,7 +176,7 @@ def dashboard_page() -> str:
     const nextBtn = document.getElementById('next');
     const pageInfo = document.getElementById('pageInfo');
 
-    let page = 1; const pageSize = 10;
+    let page = 1; let pageSize = parseInt(document.getElementById('pageSizeSelect').value, 10) || 10;
 
     async function loadKPIs() {
       const res = await fetch('/censo/kpis');
@@ -195,9 +204,11 @@ def dashboard_page() -> str:
       prevBtn.disabled = data.page <= 1; nextBtn.disabled = data.page * data.page_size >= data.total;
     }
 
-    filtrarBtn.addEventListener('click', () => { page = 1; loadPacientes(); loadKPIs(); });
+    filtrarBtn.addEventListener('click', () => { page = 1; pageSize = parseInt(document.getElementById('pageSizeSelect').value, 10) || 10; loadPacientes(); loadKPIs(); });
     prevBtn.addEventListener('click', () => { if (page>1) page--; loadPacientes(); });
     nextBtn.addEventListener('click', () => { page++; loadPacientes(); });
+    document.getElementById('pageSizeSelect').addEventListener('change', () => { page = 1; pageSize = parseInt(document.getElementById('pageSizeSelect').value, 10) || 10; loadPacientes(); });
+    document.getElementById('refresh').addEventListener('click', () => { loadKPIs(); loadPacientes(); });
 
     loadKPIs(); loadPacientes();
   </script>
