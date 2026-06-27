@@ -35,6 +35,8 @@ class PacienteInternadoResponse(BaseModel):
     cid_internacao_codigo: str | None = None
     cid_internacao_descricao: str | None = None
     data_snapshot: date | None = None
+    egaa_total_atuacoes: int = 0
+    egaa_ultima_atuacao: date | None = None
 
 
 class PacientesInternadosPage(BaseModel):
@@ -78,6 +80,7 @@ class EgaaIntervencaoPacienteCreate(BaseModel):
     descricao: str | None = None
     status: str = "aberta"
     usuario_responsavel: str | None = None
+    data_atuacao: date | None = None
     data_prevista: date | None = None
     data_conclusao: datetime | None = None
     observacao: str | None = None

@@ -10,7 +10,7 @@ from sqlalchemy import and_, desc, func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import OcupacaoLeitoGHC
+from app.models import EgaaIntervencaoPaciente, OcupacaoLeitoGHC
 from app.schemas import CensoKPIsResponse, OcupacaoPorUnidade, PacienteInternadoResponse, PacientesInternadosPage
 
 
@@ -43,6 +43,29 @@ def _date_filter_expression(data_inicio: date | None, data_fim: date | None):
 def _filtered_active_query(data_inicio: date | None = None, data_fim: date | None = None):
     query = select(OcupacaoLeitoGHC).where(_active_filter())
     return _apply_date_filter(query, data_inicio, data_fim)
+
+
+def _egaa_summary_map(db: Session, prontuarios: list[str]) -> dict[str, dict[str, object]]:
+    if not prontuarios:
+        return {}
+
+    atuacao_date_expr = func.coalesce(EgaaIntervencaoPaciente.data_atuacao, func.date(EgaaIntervencaoPaciente.created_at))
+    rows = db.execute(
+        select(
+            EgaaIntervencaoPaciente.prontuario,
+            func.count().label("egaa_total_atuacoes"),
+            func.max(atuacao_date_expr).label("egaa_ultima_atuacao"),
+        )
+        .where(EgaaIntervencaoPaciente.prontuario.in_(prontuarios))
+        .group_by(EgaaIntervencaoPaciente.prontuario)
+    ).all()
+    return {
+        row.prontuario: {
+            "egaa_total_atuacoes": int(row.egaa_total_atuacoes or 0),
+            "egaa_ultima_atuacao": row.egaa_ultima_atuacao,
+        }
+        for row in rows
+    }
 
 
 @router.get("/kpis", response_model=CensoKPIsResponse)
@@ -126,7 +149,16 @@ def get_pacientes_internados(
             .limit(page_size)
         ).scalars().all()
 
-        items = [PacienteInternadoResponse.model_validate(row) for row in rows]
+        egas_map = _egaa_summary_map(db, [row.prontuario for row in rows])
+        items = [
+            PacienteInternadoResponse.model_validate(row).model_copy(
+                update=egas_map.get(
+                    row.prontuario,
+                    {"egaa_total_atuacoes": 0, "egaa_ultima_atuacao": None},
+                )
+            )
+            for row in rows
+        ]
     except Exception:
         return PacientesInternadosPage(total=0, page=page, page_size=page_size, items=[])
 
@@ -151,7 +183,10 @@ def get_paciente_por_prontuario(
     )
     if row is None:
         raise HTTPException(status_code=404, detail="Paciente não encontrado.")
-    return PacienteInternadoResponse.model_validate(row)
+    egas_map = _egaa_summary_map(db, [prontuario])
+    return PacienteInternadoResponse.model_validate(row).model_copy(
+        update=egas_map.get(prontuario, {"egaa_total_atuacoes": 0, "egaa_ultima_atuacao": None})
+    )
 
 
 @router.get("/export/xlsx")
@@ -177,7 +212,13 @@ def export_pacientes_xlsx(
     rows = db.execute(
         base_query.order_by(desc(OcupacaoLeitoGHC.dias_internacao), OcupacaoLeitoGHC.nome_paciente)
     ).scalars().all()
-    data = [PacienteInternadoResponse.model_validate(row).model_dump(mode="json") for row in rows]
+    egas_map = _egaa_summary_map(db, [row.prontuario for row in rows])
+    data = [
+        PacienteInternadoResponse.model_validate(row)
+        .model_copy(update=egas_map.get(row.prontuario, {"egaa_total_atuacoes": 0, "egaa_ultima_atuacao": None}))
+        .model_dump(mode="json")
+        for row in rows
+    ]
     df = pd.DataFrame(data)
 
     buffer = BytesIO()

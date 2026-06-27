@@ -650,6 +650,14 @@ def dashboard_route() -> str:
 
 def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = None) -> str:
     default_min_dias_value = "" if default_min_dias is None else str(default_min_dias)
+    egaa_column_header_html = "<th>EGAA</th>" if default_min_dias is not None else ""
+    egaa_column_cell_html = """
+              <td>
+                <div class="badges">
+                  <span class="badge badge-secondary">${{egaaBadgeLabel}}</span>
+                </div>
+                <div class="muted" style="margin-top:6px">${{egaaBadgeDetail}}</div>
+              </td>""" if default_min_dias is not None else ""
     priority_field_html = """
             <div class="field">
               <label for="prioridade">Prioridade</label>
@@ -928,10 +936,10 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
           <div class="section-body">
             <table aria-live="polite">
               <thead>
-                <tr><th>Prontuario</th><th>Nome</th><th>Idade</th><th>Dias</th><th>Especialidade</th><th>Unidade</th></tr>
+                <tr><th>Prontuario</th><th>Nome</th><th>Idade</th><th>Dias</th><th>Especialidade</th><th>Unidade</th>{egaa_column_header_html}</tr>
               </thead>
               <tbody id="rows">
-                <tr><td colspan="6" class="empty">Aguardando dados...</td></tr>
+                <tr><td colspan="{7 if default_min_dias is not None else 6}" class="empty">Aguardando dados...</td></tr>
               </tbody>
             </table>
             <div class="pagination">
@@ -1045,6 +1053,12 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
       }}, {{}});
       const unidadeLiderNome = Object.entries(unidadeLider).sort((a, b) => b[1] - a[1])[0]?.[0] || '--';
       const unidadeLiderTotal = Object.entries(unidadeLider).sort((a, b) => b[1] - a[1])[0]?.[1] || 0;
+      const egaaAtivos = items.filter(item => Number(item.egaa_total_atuacoes || 0) > 0).length;
+      const egaaAtuacoesTotal = items.reduce((acc, item) => acc + Number(item.egaa_total_atuacoes || 0), 0);
+      const egaaUltimaAtuacao = items.reduce((acc, item) => {{
+        const atual = item.egaa_ultima_atuacao || '';
+        return atual && (!acc || String(atual) > String(acc)) ? atual : acc;
+      }}, '');
       kpisEl.innerHTML = `
         <div class="card"><span class="badge {badge_class}">{badge_text}</span><strong>Total encontrado</strong><div class="kpi-value">${{data.total}}</div></div>
         <div class="card"><span class="badge badge-info">Página atual</span><strong>Paginação</strong><div class="kpi-value">${{data.page}}</div></div>
@@ -1052,10 +1066,17 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
         ${{isLongaPermanencia ? `<div class="card"><span class="badge badge-warning">Longa permanência</span><strong>Dias mínimos</strong><div class="kpi-value">${{diasMinimos}}</div></div>` : ''}}
         ${{isLongaPermanencia ? `<div class="card"><span class="badge badge-warning">Acompanhamento</span><strong>Média na página</strong><div class="kpi-value">${{mediaDias}}d</div></div>` : ''}}
         ${{isLongaPermanencia ? `<div class="card"><span class="badge badge-warning">Maior permanência</span><strong>Maior valor</strong><div class="kpi-value">${{diasMaximos}}d</div><div class="muted" style="margin-top:6px">${{unidadeLiderNome}} (${{unidadeLiderTotal}} registros)</div></div>` : ''}}
+        ${{isLongaPermanencia ? `<div class="card"><span class="badge badge-secondary">EGAA</span><strong>Pacientes com atuações</strong><div class="kpi-value">${{egaaAtivos}}</div><div class="muted" style="margin-top:6px">${{egaaAtuacoesTotal}} atuações no recorte</div></div>` : ''}}
+        ${{isLongaPermanencia ? `<div class="card"><span class="badge badge-secondary">EGAA</span><strong>Última atuação</strong><div class="kpi-value" style="font-size:18px; line-height:1.3">${{egaaUltimaAtuacao ? new Intl.DateTimeFormat('pt-BR').format(new Date(egaaUltimaAtuacao)) : '--'}}</div></div>` : ''}}
       `;
       rowsEl.innerHTML = items.length
         ? items.map(it => {{
             const meta = priorityMeta(it);
+            const egaaTotal = Number(it.egaa_total_atuacoes || 0);
+            const egaaBadgeLabel = egaaTotal > 0 ? `${{egaaTotal}} atuação(ões)` : 'Sem EGAA';
+            const egaaBadgeDetail = egaaTotal > 0
+              ? `Última: ${{it.egaa_ultima_atuacao ? new Intl.DateTimeFormat('pt-BR').format(new Date(it.egaa_ultima_atuacao)) : '--'}}`
+              : 'Ainda sem registros do EGAA';
             return `<tr class="${{meta.css}}">
               <td><div class="badges"><span class="badge badge-info">${{meta.label}}</span></div><div style="margin-top:6px"><a href="/paciente/${{encodeURIComponent(it.prontuario)}}">${{it.prontuario}}</a></div></td>
               <td>${{it.nome_paciente||''}}</td>
@@ -1063,9 +1084,16 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
               <td>${{it.dias_internacao??''}}</td>
               <td>${{it.especialidade}}</td>
               <td>${{it.unidade||''}}</td>
+              ${{isLongaPermanencia ? `
+              <td>
+                <div class="badges">
+                  <span class="badge badge-secondary">${{egaaBadgeLabel}}</span>
+                </div>
+                <div class="muted" style="margin-top:6px">${{egaaBadgeDetail}}</div>
+              </td>` : ''}}
             </tr>`;
           }}).join('')
-        : '<tr><td colspan="6" class="empty">Nenhum registro encontrado com os filtros atuais.</td></tr>';
+        : '<tr><td colspan="' + (isLongaPermanencia ? '7' : '6') + '" class="empty">Nenhum registro encontrado com os filtros atuais.</td></tr>';
       pageInfo.textContent = `Página ${{data.page}} de ${{Math.ceil(data.total / data.page_size) || 1}}`;
       prevBtn.disabled = data.page <= 1;
       nextBtn.disabled = data.page * data.page_size >= data.total;
@@ -1098,7 +1126,7 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
               <strong style="display:block; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em;">${{item.status || 'sem status'}}</strong>
               <div style="font-weight:700; color:var(--brand-strong);">${{item.titulo || '--'}}</div>
               <div class="muted" style="margin-top:4px;">Tipo: ${{histTiposMap[item.tipo_intervencao_id] || item.tipo_intervencao_id || '--'}} · Responsável: ${{item.usuario_responsavel || '--'}}</div>
-              <div class="muted" style="margin-top:4px;">Atualizado em ${{item.updated_at || item.created_at || '--'}}</div>
+              <div class="muted" style="margin-top:4px;">Atuação em ${{fmtDate(item.data_atuacao)}} · Atualizado em ${{fmtDate(item.updated_at || item.created_at)}}</div>
             </div>`).join('')
         : '<div class="muted">Nenhuma intervenção registrada para este prontuário.</div>';
     }}
@@ -1423,10 +1451,19 @@ def paciente_detail_route(prontuario: str) -> str:
         descricao: '',
         status: 'aberta',
         usuario_responsavel: '',
+        data_atuacao: todayValue(),
         data_prevista: '',
         data_conclusao: '',
         observacao: '',
       }};
+    }}
+
+    function todayValue() {{
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      return `${{year}}-${{month}}-${{day}}`;
     }}
 
     function renderDrafts() {{
@@ -1474,18 +1511,24 @@ def paciente_detail_route(prontuario: str) -> str:
           </div>
           <div class="draft-grid">
             <div class="field">
+              <label>Data da atuação</label>
+              <input data-field="data_atuacao" data-index="${{index}}" type="date" value="${{draft.data_atuacao || ''}}" />
+            </div>
+            <div class="field">
               <label>Data prevista</label>
               <input data-field="data_prevista" data-index="${{index}}" type="date" value="${{draft.data_prevista || ''}}" />
             </div>
+          </div>
+          <div class="draft-grid">
             <div class="field">
               <label>Data de conclusão</label>
               <input data-field="data_conclusao" data-index="${{index}}" type="datetime-local" value="${{draft.data_conclusao || ''}}" />
             </div>
-          </div>
             <div class="field">
               <label>Observação</label>
               <input data-field="observacao" data-index="${{index}}" placeholder="Campo livre" value="${{escapeHtml(draft.observacao || '')}}" />
             </div>
+          </div>
         </article>
       `).join('');
     }}
@@ -1512,7 +1555,10 @@ def paciente_detail_route(prontuario: str) -> str:
     function fmtDate(value) {{
       if (!value) return '--';
       try {{
-        return new Intl.DateTimeFormat('pt-BR', {{ dateStyle: 'short', timeStyle: 'short' }}).format(new Date(value));
+        const normalized = typeof value === 'string' && /^\\d{{4}}-\\d{{2}}-\\d{{2}}$/.test(value)
+          ? `${{value}}T00:00:00`
+          : value;
+        return new Intl.DateTimeFormat('pt-BR', {{ dateStyle: 'short', timeStyle: 'short' }}).format(new Date(normalized));
       }} catch {{
         return String(value);
       }}
@@ -1572,11 +1618,12 @@ def paciente_detail_route(prontuario: str) -> str:
       const list = Array.isArray(items) ? items : [];
       timelineEl.innerHTML = list.length ? list.map(item => {{
         const tipoNome = escapeHtml(tiposById[item.tipo_intervencao_id] || ('ID ' + (item.tipo_intervencao_id || '--')));
+        const dataAtuacao = item.data_atuacao ? fmtDate(item.data_atuacao) : '--';
         return `
         <div class="timeline-item">
           <div class="badge badge-info">${{escapeHtml(item.status || 'sem status')}}</div>
           <div class="timeline-title">${{escapeHtml(item.titulo || '--')}}</div>
-          <div class="timeline-meta">Tipo: ${{tipoNome}} · Responsável: ${{escapeHtml(item.usuario_responsavel || '--')}}</div>
+          <div class="timeline-meta">Tipo: ${{tipoNome}} · Atuação: ${{dataAtuacao}} · Responsável: ${{escapeHtml(item.usuario_responsavel || '--')}}</div>
           <div class="timeline-meta">${{escapeHtml(item.descricao || '')}}</div>
           <div class="timeline-meta">Atualizado em ${{fmtDate(item.updated_at || item.created_at)}}</div>
         </div>
@@ -1642,6 +1689,7 @@ def paciente_detail_route(prontuario: str) -> str:
               descricao: item.descricao.trim() || null,
               status: item.status,
               usuario_responsavel: item.usuario_responsavel.trim() || null,
+              data_atuacao: item.data_atuacao || null,
               data_prevista: item.data_prevista || null,
               data_conclusao: item.data_conclusao ? `${{item.data_conclusao}}:00` : null,
               observacao: item.observacao.trim() || null,
@@ -1993,15 +2041,21 @@ def configuracoes_route() -> str:
                     <input id="responsavelIntervencao" placeholder="Nome do profissional" />
                   </div>
                   <div class="field">
-                    <label for="dataPrevistaIntervencao">Data prevista</label>
-                    <input id="dataPrevistaIntervencao" type="date" />
+                    <label for="dataAtuacaoIntervencao">Data da atuação</label>
+                    <input id="dataAtuacaoIntervencao" type="date" />
                   </div>
                 </div>
                 <div class="row">
                   <div class="field">
+                    <label for="dataPrevistaIntervencao">Data prevista</label>
+                    <input id="dataPrevistaIntervencao" type="date" />
+                  </div>
+                  <div class="field">
                     <label for="dataConclusaoIntervencao">Data de conclusão</label>
                     <input id="dataConclusaoIntervencao" type="datetime-local" />
                   </div>
+                </div>
+                <div class="row">
                   <div class="field">
                     <label for="observacaoIntervencao">Observação</label>
                     <input id="observacaoIntervencao" placeholder="Campo livre" />
@@ -2044,10 +2098,10 @@ def configuracoes_route() -> str:
             <div class="section-body">
               <table>
                 <thead>
-                  <tr><th>Prontuário</th><th>Título</th><th>Tipo</th><th>Status</th><th>Responsável</th><th>Atualizado</th></tr>
+                  <tr><th>Prontuário</th><th>Título</th><th>Tipo</th><th>Status</th><th>Responsável</th><th>Atuação</th><th>Atualizado</th></tr>
                 </thead>
                 <tbody id="intervencoesRows">
-                  <tr><td colspan="6" class="muted">Aguardando dados...</td></tr>
+                  <tr><td colspan="7" class="muted">Aguardando dados...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -2069,10 +2123,21 @@ def configuracoes_route() -> str:
     function fmtDate(value) {
       if (!value) return '--';
       try {
-        return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
+        const normalized = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+          ? `${value}T00:00:00`
+          : value;
+        return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(normalized));
       } catch {
         return String(value);
       }
+    }
+
+    function todayInputValue() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
 
     async function loadTipos() {
@@ -2101,7 +2166,7 @@ def configuracoes_route() -> str:
     async function loadIntervencoes(tiposById = {}) {
       const res = await fetch(`${API_PREFIX}/egaa/intervencoes`);
       if (!res.ok) {
-        intervencoesRowsEl.innerHTML = '<tr><td colspan="6" class="muted">Erro ao carregar intervenções.</td></tr>';
+        intervencoesRowsEl.innerHTML = '<tr><td colspan="7" class="muted">Erro ao carregar intervenções.</td></tr>';
         return [];
       }
       const items = await res.json();
@@ -2114,9 +2179,10 @@ def configuracoes_route() -> str:
               <td>${tiposById[item.tipo_intervencao_id] || item.tipo_intervencao_id || '--'}</td>
               <td>${item.status || '--'}</td>
               <td>${item.usuario_responsavel || '--'}</td>
+              <td>${fmtDate(item.data_atuacao || item.created_at)}</td>
               <td>${fmtDate(item.updated_at || item.created_at)}</td>
             </tr>`).join('')
-        : '<tr><td colspan="6" class="muted">Nenhuma intervenção registrada.</td></tr>';
+        : '<tr><td colspan="7" class="muted">Nenhuma intervenção registrada.</td></tr>';
       return list;
     }
 
@@ -2172,6 +2238,7 @@ def configuracoes_route() -> str:
         descricao: document.getElementById('descricaoIntervencao').value.trim() || null,
         status: document.getElementById('statusIntervencao').value,
         usuario_responsavel: document.getElementById('responsavelIntervencao').value.trim() || null,
+        data_atuacao: document.getElementById('dataAtuacaoIntervencao').value || null,
         data_prevista: document.getElementById('dataPrevistaIntervencao').value || null,
         data_conclusao: document.getElementById('dataConclusaoIntervencao').value ? `${document.getElementById('dataConclusaoIntervencao').value}:00` : null,
         observacao: document.getElementById('observacaoIntervencao').value.trim() || null,
@@ -2186,12 +2253,14 @@ def configuracoes_route() -> str:
         return;
       }
       intervencaoForm.reset();
+      document.getElementById('dataAtuacaoIntervencao').value = todayInputValue();
       await reloadAll();
     });
 
     document.getElementById('reloadTipos').addEventListener('click', reloadAll);
     document.getElementById('reloadIntervencoes').addEventListener('click', reloadAll);
 
+    document.getElementById('dataAtuacaoIntervencao').value = todayInputValue();
     reloadAll();
   </script>
 </body>

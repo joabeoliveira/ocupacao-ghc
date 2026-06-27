@@ -75,6 +75,7 @@ class EgaaIntervencaoPaciente(Base):
         index=True,
     )
     usuario_responsavel: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    data_atuacao: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     data_prevista: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     data_conclusao: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     observacao: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from io import BytesIO
 
 import pandas as pd
@@ -24,6 +25,10 @@ from app.schemas import (
 
 
 router = APIRouter(prefix="/egaa", tags=["EGAA"])
+
+
+def _atuacao_date_expr():
+    return func.coalesce(EgaaIntervencaoPaciente.data_atuacao, func.date(EgaaIntervencaoPaciente.created_at))
 
 
 @router.get("/tipos-intervencao", response_model=list[EgaaTipoIntervencaoResponse])
@@ -69,7 +74,13 @@ def list_intervencoes(
     if tipo_intervencao_id is not None:
         query = query.where(EgaaIntervencaoPaciente.tipo_intervencao_id == tipo_intervencao_id)
 
-    rows = db.execute(query.order_by(desc(EgaaIntervencaoPaciente.created_at), desc(EgaaIntervencaoPaciente.id))).scalars().all()
+    rows = db.execute(
+        query.order_by(
+            desc(_atuacao_date_expr()),
+            desc(EgaaIntervencaoPaciente.created_at),
+            desc(EgaaIntervencaoPaciente.id),
+        )
+    ).scalars().all()
     return [EgaaIntervencaoPacienteResponse.model_validate(row) for row in rows]
 
 
@@ -82,7 +93,9 @@ def create_intervencao(
     if tipo is None:
         raise HTTPException(status_code=404, detail="Tipo de intervenção não encontrado.")
 
-    row = EgaaIntervencaoPaciente(**payload.model_dump())
+    row = EgaaIntervencaoPaciente(**payload.model_dump(exclude_none=True))
+    if row.data_atuacao is None:
+        row.data_atuacao = date.today()
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -111,7 +124,9 @@ def create_intervencoes_lote(
             if tipo is None:
                 raise HTTPException(status_code=404, detail="Tipo de intervenção não encontrado.")
 
-            row = EgaaIntervencaoPaciente(**item.model_dump())
+            row = EgaaIntervencaoPaciente(**item.model_dump(exclude_none=True))
+            if row.data_atuacao is None:
+                row.data_atuacao = date.today()
             db.add(row)
             rows.append(row)
 
@@ -154,12 +169,14 @@ def get_indicadores(db: Session = Depends(get_db)) -> EgaaIndicadoresResponse:
             .order_by(desc("total"), EgaaTipoIntervencao.nome)
         ).all()
 
+        atuacao_data_expr = _atuacao_date_expr()
+
         mes_rows = db.execute(
             select(
-                func.date_format(EgaaIntervencaoPaciente.created_at, "%Y-%m").label("mes"),
+                func.date_format(atuacao_data_expr, "%Y-%m").label("mes"),
                 func.count().label("total"),
             )
-            .where(EgaaIntervencaoPaciente.created_at.is_not(None))
+            .where(atuacao_data_expr.is_not(None))
             .group_by("mes")
             .order_by("mes")
         ).all()
@@ -211,7 +228,7 @@ def export_egaa_xlsx(db: Session = Depends(get_db)) -> StreamingResponse:
     intervencoes = db.execute(
         select(EgaaIntervencaoPaciente, EgaaTipoIntervencao.nome.label("tipo_intervencao_nome"))
         .join(EgaaTipoIntervencao, EgaaTipoIntervencao.id == EgaaIntervencaoPaciente.tipo_intervencao_id)
-        .order_by(desc(EgaaIntervencaoPaciente.created_at), desc(EgaaIntervencaoPaciente.id))
+        .order_by(desc(_atuacao_date_expr()), desc(EgaaIntervencaoPaciente.created_at), desc(EgaaIntervencaoPaciente.id))
     ).all()
 
     df_tipos = pd.DataFrame([{
@@ -233,6 +250,7 @@ def export_egaa_xlsx(db: Session = Depends(get_db)) -> StreamingResponse:
         "descricao": row.EgaaIntervencaoPaciente.descricao,
         "status": row.EgaaIntervencaoPaciente.status,
         "usuario_responsavel": row.EgaaIntervencaoPaciente.usuario_responsavel,
+        "data_atuacao": row.EgaaIntervencaoPaciente.data_atuacao,
         "data_prevista": row.EgaaIntervencaoPaciente.data_prevista,
         "data_conclusao": row.EgaaIntervencaoPaciente.data_conclusao,
         "observacao": row.EgaaIntervencaoPaciente.observacao,
