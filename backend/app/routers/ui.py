@@ -841,7 +841,7 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
     .row-critical {{ background: rgba(198, 40, 40, 0.05); }}
     .row-warning {{ background: rgba(249, 168, 37, 0.08); }}
     .row-info {{ background: rgba(2, 136, 209, 0.05); }}
-    .badges { display:flex; flex-wrap:wrap; gap:6px; }
+    .badges {{ display:flex; flex-wrap:wrap; gap:6px; }}
     .muted {{ color:var(--muted); }}
     .pagination {{ margin-top:12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }}
     .empty {{ padding: 16px 0; color: var(--muted); }}
