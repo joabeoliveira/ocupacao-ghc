@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from io import BytesIO
+
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
+from fastapi.responses import StreamingResponse
 
 from app.database import get_db
 from app.models import EgaaIntervencaoPaciente, EgaaTipoIntervencao
@@ -137,4 +141,75 @@ def get_indicadores(db: Session = Depends(get_db)) -> EgaaIndicadoresResponse:
             for row in tipo_rows
         ],
         por_mes=[EgaaIntervencaoPorMes(mes=row.mes, total=row.total) for row in mes_rows],
+    )
+
+
+@router.get("/export/xlsx")
+def export_egaa_xlsx(db: Session = Depends(get_db)) -> StreamingResponse:
+    tipos = db.execute(
+        select(EgaaTipoIntervencao).order_by(
+            desc(EgaaTipoIntervencao.ativo),
+            EgaaTipoIntervencao.ordem_exibicao,
+            EgaaTipoIntervencao.nome,
+        )
+    ).scalars().all()
+    intervencoes = db.execute(
+        select(EgaaIntervencaoPaciente, EgaaTipoIntervencao.nome.label("tipo_intervencao_nome"))
+        .join(EgaaTipoIntervencao, EgaaTipoIntervencao.id == EgaaIntervencaoPaciente.tipo_intervencao_id)
+        .order_by(desc(EgaaIntervencaoPaciente.created_at), desc(EgaaIntervencaoPaciente.id))
+    ).all()
+
+    df_tipos = pd.DataFrame([{
+        "id": item.id,
+        "nome": item.nome,
+        "descricao": item.descricao,
+        "ativo": item.ativo,
+        "ordem_exibicao": item.ordem_exibicao,
+        "created_at": item.created_at,
+        "updated_at": item.updated_at,
+    } for item in tipos])
+    df_intervencoes = pd.DataFrame([{
+        "id": row.EgaaIntervencaoPaciente.id,
+        "prontuario": row.EgaaIntervencaoPaciente.prontuario,
+        "ocupacao_leito_id": row.EgaaIntervencaoPaciente.ocupacao_leito_id,
+        "tipo_intervencao_id": row.EgaaIntervencaoPaciente.tipo_intervencao_id,
+        "tipo_intervencao_nome": row.tipo_intervencao_nome,
+        "titulo": row.EgaaIntervencaoPaciente.titulo,
+        "descricao": row.EgaaIntervencaoPaciente.descricao,
+        "status": row.EgaaIntervencaoPaciente.status,
+        "usuario_responsavel": row.EgaaIntervencaoPaciente.usuario_responsavel,
+        "data_prevista": row.EgaaIntervencaoPaciente.data_prevista,
+        "data_conclusao": row.EgaaIntervencaoPaciente.data_conclusao,
+        "observacao": row.EgaaIntervencaoPaciente.observacao,
+        "created_at": row.EgaaIntervencaoPaciente.created_at,
+        "updated_at": row.EgaaIntervencaoPaciente.updated_at,
+    } for row in intervencoes])
+
+    indicadores = get_indicadores(db)
+    df_status = pd.DataFrame([item.model_dump() for item in indicadores.por_status])
+    df_tipo = pd.DataFrame([item.model_dump() for item in indicadores.por_tipo])
+    df_mes = pd.DataFrame([item.model_dump() for item in indicadores.por_mes])
+    df_resumo = pd.DataFrame([{
+        "total_intervencoes": indicadores.total_intervencoes,
+        "pacientes_com_intervencao": indicadores.pacientes_com_intervencao,
+        "abertas": indicadores.abertas,
+        "em_andamento": indicadores.em_andamento,
+        "concluidas": indicadores.concluidas,
+        "canceladas": indicadores.canceladas,
+    }])
+
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df_resumo.to_excel(writer, index=False, sheet_name="resumo")
+        df_status.to_excel(writer, index=False, sheet_name="por_status")
+        df_tipo.to_excel(writer, index=False, sheet_name="por_tipo")
+        df_mes.to_excel(writer, index=False, sheet_name="por_mes")
+        df_tipos.to_excel(writer, index=False, sheet_name="tipos")
+        df_intervencoes.to_excel(writer, index=False, sheet_name="intervencoes")
+    buffer.seek(0)
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="egaa_resultados.xlsx"'},
     )

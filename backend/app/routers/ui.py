@@ -328,6 +328,7 @@ def dashboard_page() -> str:
           </div>
           <div class="header-actions">
             <a class="pill-link" href="/upload">Ir para Upload</a>
+            <a class="pill-link" href="/api/censo/export/xlsx">Exportar Pacientes</a>
             <a class="pill-link" href="/configuracoes">Configurações EGAA</a>
           </div>
         </div>
@@ -871,6 +872,7 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
             <p class="subtitle">{subtitle}</p>
           </div>
           <a class="pill-link" href="/dashboard">Voltar ao dashboard</a>
+          <a class="pill-link" href="/api/censo/export/xlsx?min_dias=15">Exportar Longa Permanência</a>
         </div>
 
         <section class="filters">
@@ -1352,6 +1354,7 @@ def configuracoes_route() -> str:
           <div class="header-actions">
             <a class="pill-link" href="/dashboard">Voltar ao dashboard</a>
             <a class="pill-link" href="/longa-permanencia">Abrir longa permanência</a>
+            <a class="pill-link" href="/api/egaa/export/xlsx">Exportar EGAA</a>
           </div>
         </div>
 

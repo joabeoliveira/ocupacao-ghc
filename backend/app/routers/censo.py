@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from datetime import date
+from io import BytesIO
 
+import pandas as pd
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy import and_, desc, func, select
 from sqlalchemy.orm import Session
 
@@ -118,4 +121,52 @@ def get_pacientes_internados(
         page=page,
         page_size=page_size,
         items=[PacienteInternadoResponse.model_validate(row) for row in rows],
+    )
+
+
+@router.get("/export/xlsx")
+def export_pacientes_xlsx(
+    especialidade: str | None = Query(default=None),
+    unidade: str | None = Query(default=None),
+    data_inicio: date | None = Query(default=None),
+    data_fim: date | None = Query(default=None),
+    min_dias: int | None = Query(default=None, ge=0),
+    idade_minima: int | None = Query(default=None, ge=0),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    base_query = _filtered_active_query(data_inicio, data_fim)
+    if especialidade:
+        base_query = base_query.where(OcupacaoLeitoGHC.especialidade == especialidade)
+    if unidade:
+        base_query = base_query.where(OcupacaoLeitoGHC.unidade == unidade)
+    if min_dias is not None:
+        base_query = base_query.where(OcupacaoLeitoGHC.dias_internacao >= min_dias)
+    if idade_minima is not None:
+        base_query = base_query.where(OcupacaoLeitoGHC.idade_anos >= idade_minima)
+
+    rows = db.execute(
+        base_query.order_by(desc(OcupacaoLeitoGHC.dias_internacao), OcupacaoLeitoGHC.nome_paciente)
+    ).scalars().all()
+    data = [PacienteInternadoResponse.model_validate(row).model_dump(mode="json") for row in rows]
+    df = pd.DataFrame(data)
+
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+      df.to_excel(writer, index=False, sheet_name="pacientes")
+      pd.DataFrame([{
+          "especialidade": especialidade or "",
+          "unidade": unidade or "",
+          "data_inicio": data_inicio.isoformat() if data_inicio else "",
+          "data_fim": data_fim.isoformat() if data_fim else "",
+          "min_dias": min_dias if min_dias is not None else "",
+          "idade_minima": idade_minima if idade_minima is not None else "",
+          "total_registros": len(data),
+      }]).to_excel(writer, index=False, sheet_name="filtros")
+    buffer.seek(0)
+
+    filename = "egaa_pacientes.xlsx"
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
