@@ -4,7 +4,7 @@ from datetime import date
 from io import BytesIO
 
 import pandas as pd
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import and_, desc, func, select
 from sqlalchemy.orm import Session
@@ -136,6 +136,22 @@ def get_pacientes_internados(
         page_size=page_size,
         items=items,
     )
+
+
+@router.get("/paciente/{prontuario}", response_model=PacienteInternadoResponse)
+def get_paciente_por_prontuario(
+    prontuario: str,
+    db: Session = Depends(get_db),
+) -> PacienteInternadoResponse:
+    row = db.scalar(
+        select(OcupacaoLeitoGHC)
+        .where(_active_filter())
+        .where(OcupacaoLeitoGHC.prontuario == prontuario)
+        .order_by(desc(OcupacaoLeitoGHC.dias_internacao), OcupacaoLeitoGHC.nome_paciente)
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Paciente não encontrado.")
+    return PacienteInternadoResponse.model_validate(row)
 
 
 @router.get("/export/xlsx")

@@ -1057,7 +1057,7 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
         ? items.map(it => {{
             const meta = priorityMeta(it);
             return `<tr class="${{meta.css}}">
-              <td><div class="badges"><span class="badge badge-info">${{meta.label}}</span></div><div style="margin-top:6px">${{it.prontuario}}</div></td>
+              <td><div class="badges"><span class="badge badge-info">${{meta.label}}</span></div><div style="margin-top:6px"><a href="/paciente/${{encodeURIComponent(it.prontuario)}}">${{it.prontuario}}</a></div></td>
               <td>${{it.nome_paciente||''}}</td>
               <td>${{it.idade_anos??''}}</td>
               <td>${{it.dias_internacao??''}}</td>
@@ -1150,6 +1150,361 @@ def longa_permanencia_route() -> str:
         "Pacientes com 15+ dias de internação para acompanhamento prioritário.",
         default_min_dias=15,
     )
+
+
+@router.get("/paciente/{prontuario}", response_class=HTMLResponse)
+def paciente_detail_route(prontuario: str) -> str:
+    return f"""
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EGAA - Paciente {prontuario}</title>
+  <style>
+    :root {{
+      --bg: #F7F9FB;
+      --panel: #FFFFFF;
+      --panel-border: #DCE3EA;
+      --text: #1F2937;
+      --muted: #6B7280;
+      --brand: #005C99;
+      --brand-strong: #004A7A;
+      --secondary: #00A79D;
+      --success: #2E7D32;
+      --warning: #F9A825;
+      --error: #C62828;
+      --info: #0288D1;
+    }}
+    body {{
+      font-family: Inter, Arial, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(0, 92, 153, 0.08), transparent 28%),
+        linear-gradient(180deg, #ffffff 0%, var(--bg) 100%);
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+    }}
+    .layout {{ display:grid; grid-template-columns: 260px 1fr; min-height: 100vh; }}
+    .sidebar {{
+      background: rgba(255,255,255,0.84);
+      backdrop-filter: blur(10px);
+      border-right: 1px solid var(--panel-border);
+      padding: 24px 18px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      box-sizing: border-box;
+    }}
+    .brand {{ font-size: 18px; font-weight: 700; color: var(--brand-strong); margin: 0; }}
+    .brand-subtitle {{ margin: 6px 0 18px; color: var(--muted); font-size: 13px; }}
+    .nav {{ display:flex; flex-direction:column; gap:8px; margin-top: 18px; }}
+    .nav a {{
+      color: var(--text);
+      text-decoration: none;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      font-weight: 600;
+    }}
+    .nav a.primary {{ background: var(--brand); color: #fff; }}
+    .main {{ padding: 24px; }}
+    .shell {{ max-width: 1240px; margin: 0 auto; }}
+    .header {{ display:flex; align-items:center; justify-content:space-between; gap: 16px; margin-bottom: 16px; }}
+    h1 {{ color:var(--brand-strong); margin:0; }}
+    .subtitle {{ margin: 8px 0 0; color: var(--muted); }}
+    .pill-link {{
+      display:inline-flex; align-items:center; gap:8px; padding:10px 12px;
+      border-radius: 999px; background: var(--panel); border: 1px solid var(--panel-border);
+      color: var(--brand); text-decoration: none; font-weight: 600;
+    }}
+    .cards {{ display:grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap:12px; margin-top:16px; }}
+    .card {{
+      background:var(--panel); padding:14px 16px; border-radius:14px; box-shadow:0 8px 24px rgba(16,24,40,0.08);
+      border:1px solid var(--panel-border); min-width:0;
+    }}
+    .card strong {{ display:block; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }}
+    .kpi-value {{ font-size:28px; font-weight:700; color:var(--brand-strong); line-height:1.1; }}
+    .grid {{ display:grid; grid-template-columns: 1.15fr 1fr; gap: 16px; margin-top: 16px; }}
+    .section {{
+      background:var(--panel); border:1px solid var(--panel-border); border-radius:14px;
+      box-shadow:0 8px 24px rgba(16,24,40,0.08); overflow:hidden;
+    }}
+    .section-header {{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:14px 16px; border-bottom:1px solid #edf2f7;
+    }}
+    .section-header h2 {{ margin:0; font-size:16px; color:var(--brand-strong); }}
+    .section-header p {{ margin:4px 0 0; color:var(--muted); font-size:13px; }}
+    .section-body {{ padding: 16px; }}
+    .muted {{ color: var(--muted); }}
+    .field {{ display:flex; flex-direction:column; gap:6px; margin-bottom: 12px; }}
+    .field label {{ font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; }}
+    .field input, .field select, .field textarea {{
+      width:100%; padding:10px 12px; border-radius:10px; border:1px solid #cfd8e3; box-sizing:border-box; background:#fff; font:inherit;
+    }}
+    .field textarea {{ min-height: 92px; resize: vertical; }}
+    .row {{ display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }}
+    .actions {{ display:flex; gap:8px; flex-wrap:wrap; margin-top: 12px; }}
+    button {{
+      padding:10px 12px; border-radius:8px; border:none; background:var(--brand); color:#fff; cursor:pointer; font-weight:600;
+    }}
+    button.secondary {{ background:#EEF5FA; color:var(--brand); border:1px solid var(--panel-border); }}
+    .timeline {{ display:flex; flex-direction:column; gap:12px; }}
+    .timeline-item {{
+      padding:12px 14px; border:1px solid var(--panel-border); border-radius:12px; background:#fff;
+    }}
+    .badge {{
+      display:inline-flex; align-items:center; gap:6px; padding: 5px 10px; border-radius: 999px;
+      font-size: 12px; font-weight: 700; letter-spacing: .02em; margin-bottom: 10px;
+    }}
+    .badge-info {{ background: rgba(2, 136, 209, 0.12); color: var(--info); }}
+    .badge-warning {{ background: rgba(249, 168, 37, 0.16); color: #8A6500; }}
+    .badge-secondary {{ background: rgba(0, 167, 157, 0.12); color: var(--secondary); }}
+    .badge-success {{ background: rgba(46, 125, 50, 0.12); color: var(--success); }}
+    .badge-error {{ background: rgba(198, 40, 40, 0.12); color: var(--error); }}
+    .timeline-title {{ font-weight: 700; color: var(--brand-strong); }}
+    .timeline-meta {{ margin-top: 4px; color: var(--muted); font-size: 13px; }}
+    @media (max-width: 1100px) {{
+      .layout {{ grid-template-columns: 1fr; }}
+      .sidebar {{ position: static; height: auto; border-right: none; border-bottom: 1px solid var(--panel-border); }}
+      .grid {{ grid-template-columns: 1fr; }}
+      .row {{ grid-template-columns: 1fr; }}
+    }}
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <p class="brand">EGAA</p>
+      <p class="brand-subtitle">Detalhe do paciente</p>
+      <nav class="nav">
+        <a href="/dashboard">Dashboard</a>
+        <a class="primary" href="/pacientes">Voltar para Pacientes</a>
+        <a href="/longa-permanencia">Longa Permanência</a>
+        <a href="/configuracoes">Configurações</a>
+      </nav>
+    </aside>
+    <main class="main">
+      <div class="shell">
+        <div class="header">
+          <div>
+            <h1 id="titulo">Paciente {prontuario}</h1>
+            <p class="subtitle" id="subtitulo">Carregando informações do paciente...</p>
+          </div>
+          <div class="actions">
+            <a class="pill-link" href="/pacientes">Voltar</a>
+            <a class="pill-link" id="linkLonga" href="/longa-permanencia">Longa permanência</a>
+          </div>
+        </div>
+
+        <div class="cards" id="kpis">
+          <div class="card"><strong>Prontuário</strong><div class="kpi-value">--</div></div>
+          <div class="card"><strong>Dias</strong><div class="kpi-value">--</div></div>
+          <div class="card"><strong>Idade</strong><div class="kpi-value">--</div></div>
+          <div class="card"><strong>Unidade</strong><div class="kpi-value">--</div></div>
+        </div>
+
+        <div class="grid">
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <h2>Resumo clínico</h2>
+                <p>Dados ativos do paciente internado.</p>
+              </div>
+            </div>
+            <div class="section-body">
+              <div id="resumo" class="muted">Aguardando dados...</div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <h2>Nova atuação EGAA</h2>
+                <p>Registre evolução, pendência ou intervenção.</p>
+              </div>
+            </div>
+            <div class="section-body">
+              <form id="intervencaoForm">
+                <div class="field">
+                  <label for="tipoIntervencaoId">Tipo de intervenção</label>
+                  <select id="tipoIntervencaoId" required>
+                    <option value="">Carregando...</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="titulo">Título</label>
+                  <input id="titulo" required placeholder="Ex: Pendência para alta" />
+                </div>
+                <div class="field">
+                  <label for="descricao">Descrição</label>
+                  <textarea id="descricao" placeholder="Detalhe a atuação do EGAA"></textarea>
+                </div>
+                <div class="row">
+                  <div class="field">
+                    <label for="status">Status</label>
+                    <select id="status">
+                      <option value="aberta">Aberta</option>
+                      <option value="em_andamento">Em andamento</option>
+                      <option value="concluida">Concluída</option>
+                      <option value="cancelada">Cancelada</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="responsavel">Responsável</label>
+                    <input id="responsavel" placeholder="Nome do profissional" />
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="field">
+                    <label for="dataPrevista">Data prevista</label>
+                    <input id="dataPrevista" type="date" />
+                  </div>
+                  <div class="field">
+                    <label for="observacao">Observação</label>
+                    <input id="observacao" placeholder="Campo livre" />
+                  </div>
+                </div>
+                <div class="actions">
+                  <button type="submit">Salvar atuação</button>
+                  <button type="button" class="secondary" id="recarregar">Recarregar</button>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <section class="section" style="grid-column: 1 / -1;">
+            <div class="section-header">
+              <div>
+                <h2>Linha do tempo EGAA</h2>
+                <p>Intervenções registradas para este prontuário.</p>
+              </div>
+            </div>
+            <div class="section-body">
+              <div class="timeline" id="timeline">
+                <div class="muted">Carregando histórico...</div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const API_PREFIX = '/api';
+    const PRONTUARIO = {prontuario!r};
+    const resumoEl = document.getElementById('resumo');
+    const kpisEl = document.getElementById('kpis');
+    const timelineEl = document.getElementById('timeline');
+    const subtituloEl = document.getElementById('subtitulo');
+    const tipoIntervencaoIdEl = document.getElementById('tipoIntervencaoId');
+    const form = document.getElementById('intervencaoForm');
+
+    function fmtDate(value) {{
+      if (!value) return '--';
+      try {{
+        return new Intl.DateTimeFormat('pt-BR', {{ dateStyle: 'short', timeStyle: 'short' }}).format(new Date(value));
+      }} catch {{
+        return String(value);
+      }}
+    }}
+
+    async function loadPaciente() {{
+      const res = await fetch(`${{API_PREFIX}}/censo/paciente/${{encodeURIComponent(PRONTUARIO)}}`);
+      if (!res.ok) {{
+        resumoEl.innerHTML = '<div class="muted">Paciente não encontrado ou indisponível.</div>';
+        return null;
+      }}
+      const data = await res.json();
+      kpisEl.innerHTML = `
+        <div class="card"><strong>Prontuário</strong><div class="kpi-value">${{data.prontuario || '--'}}</div></div>
+        <div class="card"><strong>Dias</strong><div class="kpi-value">${{data.dias_internacao ?? '--'}}</div></div>
+        <div class="card"><strong>Idade</strong><div class="kpi-value">${{data.idade_anos ?? '--'}}</div></div>
+        <div class="card"><strong>Unidade</strong><div class="kpi-value" style="font-size:18px; line-height:1.3">${{data.unidade || '--'}}</div></div>
+      `;
+      subtituloEl.textContent = `${{data.nome_paciente || 'Paciente'}} · ${{data.especialidade || '--'}}`;
+      resumoEl.innerHTML = `
+        <div><strong>Nome:</strong> ${{data.nome_paciente || '--'}}</div>
+        <div><strong>Especialidade:</strong> ${{data.especialidade || '--'}}</div>
+        <div><strong>Unidade:</strong> ${{data.unidade || '--'}}</div>
+        <div><strong>Enfermaria:</strong> ${{data.enfermaria || '--'}}</div>
+        <div><strong>Leito:</strong> ${{data.leito || '--'}}</div>
+        <div><strong>CID:</strong> ${{data.cid_internacao_codigo || '--'}} ${{data.cid_internacao_descricao ? '- ' + data.cid_internacao_descricao : ''}}</div>
+        <div><strong>Internação:</strong> ${{fmtDate(data.data_internacao)}}</div>
+      `;
+      return data;
+    }}
+
+    async function loadTipos() {{
+      const res = await fetch(`${{API_PREFIX}}/egaa/tipos-intervencao`);
+      if (!res.ok) {{
+        tipoIntervencaoIdEl.innerHTML = '<option value="">Erro ao carregar</option>';
+        return [];
+      }}
+      const items = await res.json();
+      const list = Array.isArray(items) ? items : [];
+      tipoIntervencaoIdEl.innerHTML = ['<option value="">Selecione...</option>'].concat(
+        list.map(item => `<option value="${{item.id}}">${{item.nome || '--'}}</option>`)
+      ).join('');
+      return list;
+    }}
+
+    async function loadHistorico() {{
+      const res = await fetch(`${{API_PREFIX}}/egaa/intervencoes?prontuario=${{encodeURIComponent(PRONTUARIO)}}`);
+      if (!res.ok) {{
+        timelineEl.innerHTML = '<div class="muted">Erro ao carregar histórico.</div>';
+        return [];
+      }}
+      const items = await res.json();
+      const list = Array.isArray(items) ? items : [];
+      timelineEl.innerHTML = list.length ? list.map(item => `
+        <div class="timeline-item">
+          <div class="badge badge-info">${{item.status || 'sem status'}}</div>
+          <div class="timeline-title">${{item.titulo || '--'}}</div>
+          <div class="timeline-meta">Tipo ID ${{item.tipo_intervencao_id}} · Responsável: ${{item.usuario_responsavel || '--'}}</div>
+          <div class="timeline-meta">${{item.descricao || ''}}</div>
+          <div class="timeline-meta">Atualizado em ${{fmtDate(item.updated_at || item.created_at)}}</div>
+        </div>
+      `).join('') : '<div class="muted">Nenhuma intervenção registrada para este paciente.</div>';
+      return list;
+    }}
+
+    form.addEventListener('submit', async (event) => {{
+      event.preventDefault();
+      const payload = {{
+        prontuario: PRONTUARIO,
+        tipo_intervencao_id: Number(tipoIntervencaoIdEl.value),
+        titulo: document.getElementById('titulo').value.trim(),
+        descricao: document.getElementById('descricao').value.trim() || null,
+        status: document.getElementById('status').value,
+        usuario_responsavel: document.getElementById('responsavel').value.trim() || null,
+        data_prevista: document.getElementById('dataPrevista').value || null,
+        observacao: document.getElementById('observacao').value.trim() || null,
+      }};
+      const res = await fetch(`${{API_PREFIX}}/egaa/intervencoes`, {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify(payload),
+      }});
+      if (!res.ok) {{
+        alert('Não foi possível salvar a atuação.');
+        return;
+      }}
+      form.reset();
+      await loadHistorico();
+    }});
+
+    document.getElementById('recarregar').addEventListener('click', async () => {{
+      await Promise.all([loadPaciente(), loadHistorico()]);
+    }});
+
+    Promise.all([loadPaciente(), loadTipos(), loadHistorico()]);
+  </script>
+</body>
+</html>
+"""
 
 
 @router.get("/configuracoes", response_class=HTMLResponse)
