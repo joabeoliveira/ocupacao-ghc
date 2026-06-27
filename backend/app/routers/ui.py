@@ -385,6 +385,40 @@ def dashboard_page() -> str:
           </div>
         </section>
 
+        <section class="section">
+          <div class="section-header">
+            <div>
+              <h2>Resultados do EGAA</h2>
+              <p id="egaaResumo" class="muted">Aguardando indicadores de atuação.</p>
+            </div>
+          </div>
+          <div class="section-body">
+            <div class="cards" id="egaaKpis">
+              <div class="card">Aguardando dados...</div>
+            </div>
+            <div class="grid" style="margin-top:16px;">
+              <div class="card">
+                <strong>Intervenções por status</strong>
+                <div class="chart-list" id="egaaStatusChart">
+                  <div class="muted">Aguardando dados...</div>
+                </div>
+              </div>
+              <div class="card">
+                <strong>Intervenções por tipo</strong>
+                <div class="chart-list" id="egaaTipoChart">
+                  <div class="muted">Aguardando dados...</div>
+                </div>
+              </div>
+            </div>
+            <div class="card" style="margin-top:16px;">
+              <strong>Evolução mensal</strong>
+              <div class="chart-list" id="egaaMesChart">
+                <div class="muted">Aguardando dados...</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section class="section" id="unidadesSection">
           <div class="section-header">
             <div>
@@ -433,6 +467,11 @@ def dashboard_page() -> str:
     const kpisEl = document.getElementById('kpis');
     const longaChartEl = document.getElementById('longaChart');
     const longaResumoEl = document.getElementById('longaResumo');
+    const egaaResumoEl = document.getElementById('egaaResumo');
+    const egaaKpisEl = document.getElementById('egaaKpis');
+    const egaaStatusChartEl = document.getElementById('egaaStatusChart');
+    const egaaTipoChartEl = document.getElementById('egaaTipoChart');
+    const egaaMesChartEl = document.getElementById('egaaMesChart');
     const unidadesChartEl = document.getElementById('unidadesChart');
     const unidadesResumoEl = document.getElementById('unidadesResumo');
     const rowsEl = document.getElementById('rows');
@@ -463,6 +502,7 @@ def dashboard_page() -> str:
         <div class="card"><span class="badge badge-info">Ao vivo</span><strong>Internados</strong><div class="kpi-value">${data.total_internados}</div></div>
         <div class="card"><span class="badge badge-warning">Atenção</span><strong>>=15 dias</strong><div class="kpi-value">${data.longa_permanencia_15}</div></div>
         <div class="card"><span class="badge badge-error">Crítico</span><strong>>=30 dias</strong><div class="kpi-value">${data.longa_permanencia_30}</div></div>
+        <div class="card"><span class="badge badge-secondary">60+ anos</span><strong>Pacientes</strong><div class="kpi-value">${data.longa_permanencia_60_anos}</div></div>
         <div class="card"><span class="badge badge-success">Ativo</span><strong>Unidades ativas</strong><div class="kpi-value">${unidades.length}</div><div class="muted" style="margin-top:6px">Top ${topUnidades.length}${resto ? ` + ${resto} outras` : ''}</div></div>`;
       unidadesResumoEl.textContent = unidades.length
         ? `Mostrando as ${topUnidades.length} unidades com mais pacientes de um total de ${unidades.length}.`
@@ -509,6 +549,63 @@ def dashboard_page() -> str:
         : '<div class="muted">Nenhuma unidade para exibir.</div>';
     }
 
+    async function loadEgaaIndicadores() {
+      const res = await fetch(`${API_PREFIX}/egaa/indicadores`);
+      if (!res.ok) {
+        egaaResumoEl.textContent = 'Não foi possível carregar os indicadores do EGAA.';
+        egaaKpisEl.innerHTML = '<div class="card">Erro ao obter indicadores</div>';
+        egaaStatusChartEl.innerHTML = '<div class="muted">Sem dados.</div>';
+        egaaTipoChartEl.innerHTML = '<div class="muted">Sem dados.</div>';
+        egaaMesChartEl.innerHTML = '<div class="muted">Sem dados.</div>';
+        return;
+      }
+      const data = await res.json();
+      const porStatus = Array.isArray(data.por_status) ? data.por_status : [];
+      const porTipo = Array.isArray(data.por_tipo) ? data.por_tipo : [];
+      const porMes = Array.isArray(data.por_mes) ? data.por_mes : [];
+      egaaResumoEl.textContent = data.total_intervencoes
+        ? `${data.total_intervencoes} intervenções registradas em ${data.pacientes_com_intervencao} pacientes distintos.`
+        : 'Ainda não há intervenções registradas.';
+      egaaKpisEl.innerHTML = `
+        <div class="card"><span class="badge badge-info">Total</span><strong>Intervenções</strong><div class="kpi-value">${data.total_intervencoes}</div></div>
+        <div class="card"><span class="badge badge-warning">Abertas</span><strong>Pendentes</strong><div class="kpi-value">${data.abertas}</div></div>
+        <div class="card"><span class="badge badge-secondary">Em andamento</span><strong>Ativas</strong><div class="kpi-value">${data.em_andamento}</div></div>
+        <div class="card"><span class="badge badge-success">Concluídas</span><strong>Fechadas</strong><div class="kpi-value">${data.concluidas}</div></div>
+      `;
+      const statusMax = porStatus.reduce((acc, item) => Math.max(acc, item.total || 0), 0) || 1;
+      egaaStatusChartEl.innerHTML = porStatus.length
+        ? porStatus.map(item => {
+            const width = Math.max(6, Math.round(((item.total || 0) / statusMax) * 100));
+            return `
+              <div class="chart-row">
+                <div class="chart-name" title="${item.status || '--'}">${item.status || '--'}</div>
+                <div class="chart-track" aria-hidden="true"><div class="chart-fill" style="width:${width}%"></div></div>
+                <div class="chart-value">${item.total}</div>
+              </div>`;
+          }).join('')
+        : '<div class="muted">Nenhum status para exibir.</div>';
+      const tipoMax = porTipo.reduce((acc, item) => Math.max(acc, item.total || 0), 0) || 1;
+      egaaTipoChartEl.innerHTML = porTipo.length
+        ? porTipo.map(item => {
+            const width = Math.max(6, Math.round(((item.total || 0) / tipoMax) * 100));
+            return `
+              <div class="chart-row">
+                <div class="chart-name" title="${item.tipo_intervencao_nome || '--'}">${item.tipo_intervencao_nome || '--'}</div>
+                <div class="chart-track" aria-hidden="true"><div class="chart-fill" style="width:${width}%"></div></div>
+                <div class="chart-value">${item.total}</div>
+              </div>`;
+          }).join('')
+        : '<div class="muted">Nenhum tipo para exibir.</div>';
+      egaaMesChartEl.innerHTML = porMes.length
+        ? porMes.map(item => `
+            <div class="chart-row">
+              <div class="chart-name" title="${item.mes || '--'}">${item.mes || '--'}</div>
+              <div class="chart-track" aria-hidden="true"><div class="chart-fill" style="width:${Math.max(6, Math.round(((item.total || 0) / (porMes.reduce((acc, cur) => Math.max(acc, cur.total || 0), 0) || 1)) * 100))}%"></div></div>
+              <div class="chart-value">${item.total}</div>
+            </div>`).join('')
+        : '<div class="muted">Nenhuma evolução mensal para exibir.</div>';
+    }
+
     async function loadPacientes() {
       const params = new URLSearchParams();
       params.set('page', page);
@@ -534,7 +631,7 @@ def dashboard_page() -> str:
     dataFimEl.addEventListener('change', () => { page = 1; loadPacientes(); loadKPIs(); });
     document.getElementById('refresh').addEventListener('click', () => { loadKPIs(); loadPacientes(); });
 
-    loadKPIs(); loadPacientes();
+    loadKPIs(); loadPacientes(); loadEgaaIndicadores();
   </script>
 </body>
 </html>
@@ -552,6 +649,18 @@ def dashboard_route() -> str:
 
 def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = None) -> str:
     default_min_dias_value = "" if default_min_dias is None else str(default_min_dias)
+    priority_field_html = """
+            <div class="field">
+              <label for="prioridade">Prioridade</label>
+              <select id="prioridade">
+                <option value="">Sem atalho</option>
+                <option value="15">15+ dias</option>
+                <option value="30">30+ dias</option>
+                <option value="60">60+ anos</option>
+                <option value="30-60">30+ dias e 60+ anos</option>
+              </select>
+            </div>
+""" if default_min_dias is not None else ""
     badge_text = "Longa permanência" if default_min_dias is not None else "Lista geral"
     badge_class = "badge-warning" if default_min_dias is not None else "badge-info"
     nav_items = [
@@ -728,6 +837,10 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
     table {{ width:100%; border-collapse:collapse; margin-top:4px; background:transparent; }}
     th, td {{ padding:10px 8px; border-bottom:1px solid #edf2f7; text-align:left }}
     th {{ color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }}
+    .row-critical {{ background: rgba(198, 40, 40, 0.05); }}
+    .row-warning {{ background: rgba(249, 168, 37, 0.08); }}
+    .row-info {{ background: rgba(2, 136, 209, 0.05); }}
+    .badges { display:flex; flex-wrap:wrap; gap:6px; }
     .muted {{ color:var(--muted); }}
     .pagination {{ margin-top:12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }}
     .empty {{ padding: 16px 0; color: var(--muted); }}
@@ -782,6 +895,7 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
               <label for="minDias">Dias mínimos</label>
               <input id="minDias" type="number" min="0" step="1" value="{default_min_dias_value}" placeholder="opcional" />
             </div>
+            {priority_field_html}
             <div class="field">
               <label for="pageSizeSelect">Itens por página</label>
               <select id="pageSizeSelect">
@@ -824,6 +938,36 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
             </div>
           </div>
         </section>
+
+        <section class="section">
+          <div class="section-header">
+            <div>
+              <h2>Histórico EGAA por prontuário</h2>
+              <p>Consulta rápida para ver as atuações registradas no paciente.</p>
+            </div>
+          </div>
+          <div class="section-body">
+            <div class="filters-grid" style="grid-template-columns: 1.2fr 1fr auto;">
+              <div class="field" style="margin-bottom:0;">
+                <label for="histProntuario">Prontuário</label>
+                <input id="histProntuario" placeholder="Digite um prontuário" />
+              </div>
+              <div class="field" style="margin-bottom:0;">
+                <label for="histTipo">Tipo</label>
+                <select id="histTipo">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+              <div class="field" style="margin-bottom:0; align-self:end;">
+                <button id="histBuscar" type="button">Buscar histórico</button>
+              </div>
+            </div>
+            <p id="histResumo" class="muted" style="margin: 12px 0 0;">Informe um prontuário para consultar as atuações do EGAA.</p>
+            <div class="chart-list" id="histRows" style="margin-top: 12px;">
+              <div class="muted">Nenhuma consulta realizada.</div>
+            </div>
+          </div>
+        </section>
       </div>
     </main>
   </div>
@@ -838,12 +982,28 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
     const dataInicioEl = document.getElementById('dataInicio');
     const dataFimEl = document.getElementById('dataFim');
     const minDiasEl = document.getElementById('minDias');
+    const prioridadeEl = document.getElementById('prioridade');
     const filtrarBtn = document.getElementById('filtrar');
     const prevBtn = document.getElementById('prev');
     const nextBtn = document.getElementById('next');
     const pageInfo = document.getElementById('pageInfo');
+    const histProntuarioEl = document.getElementById('histProntuario');
+    const histTipoEl = document.getElementById('histTipo');
+    const histBuscarBtn = document.getElementById('histBuscar');
+    const histRowsEl = document.getElementById('histRows');
+    const histResumoEl = document.getElementById('histResumo');
     let page = 1;
     let pageSize = parseInt(document.getElementById('pageSizeSelect').value, 10) || 10;
+    let histTiposMap = {{}};
+
+    function priorityMeta(item) {{
+      const dias = Number(item.dias_internacao || 0);
+      const idade = Number(item.idade_anos || 0);
+      if (dias >= 30 && idade >= 60) return {{ label: 'Prioridade máxima', css: 'row-critical' }};
+      if (dias >= 30) return {{ label: 'Longa permanência', css: 'row-warning' }};
+      if (idade >= 60) return {{ label: '60+ anos', css: 'row-info' }};
+      return {{ label: 'Acompanhamento', css: '' }};
+    }}
 
     async function loadPacientes() {{
       const params = new URLSearchParams();
@@ -854,6 +1014,16 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
       if (dataInicioEl.value) params.set('data_inicio', dataInicioEl.value);
       if (dataFimEl.value) params.set('data_fim', dataFimEl.value);
       if (minDiasEl.value) params.set('min_dias', minDiasEl.value);
+      if (prioridadeEl && prioridadeEl.value === '15') params.set('min_dias', '15');
+      if (prioridadeEl && prioridadeEl.value === '30') params.set('min_dias', '30');
+      if (prioridadeEl && prioridadeEl.value === '60') {{
+        params.delete('min_dias');
+        params.set('idade_minima', '60');
+      }}
+      if (prioridadeEl && prioridadeEl.value === '30-60') {{
+        params.set('min_dias', '30');
+        params.set('idade_minima', '60');
+      }}
 
       const res = await fetch(`${{API_PREFIX}}/censo/pacientes?` + params.toString());
       if (!res.ok) {{
@@ -882,11 +1052,53 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
         ${{isLongaPermanencia ? `<div class="card"><span class="badge badge-warning">Maior permanência</span><strong>Maior valor</strong><div class="kpi-value">${{diasMaximos}}d</div><div class="muted" style="margin-top:6px">${{unidadeLiderNome}} (${{unidadeLiderTotal}} registros)</div></div>` : ''}}
       `;
       rowsEl.innerHTML = items.length
-        ? items.map(it => `<tr><td>${{it.prontuario}}</td><td>${{it.nome_paciente||''}}</td><td>${{it.idade_anos??''}}</td><td>${{it.dias_internacao??''}}</td><td>${{it.especialidade}}</td><td>${{it.unidade||''}}</td></tr>`).join('')
+        ? items.map(it => {{
+            const meta = priorityMeta(it);
+            return `<tr class="${{meta.css}}">
+              <td><div class="badges"><span class="badge badge-info">${{meta.label}}</span></div><div style="margin-top:6px">${{it.prontuario}}</div></td>
+              <td>${{it.nome_paciente||''}}</td>
+              <td>${{it.idade_anos??''}}</td>
+              <td>${{it.dias_internacao??''}}</td>
+              <td>${{it.especialidade}}</td>
+              <td>${{it.unidade||''}}</td>
+            </tr>`;
+          }}).join('')
         : '<tr><td colspan="6" class="empty">Nenhum registro encontrado com os filtros atuais.</td></tr>';
       pageInfo.textContent = `Página ${{data.page}} de ${{Math.ceil(data.total / data.page_size) || 1}}`;
       prevBtn.disabled = data.page <= 1;
       nextBtn.disabled = data.page * data.page_size >= data.total;
+    }}
+
+    async function loadHistoricoEGAA() {{
+      const prontuario = histProntuarioEl.value.trim();
+      if (!prontuario) {{
+        histResumoEl.textContent = 'Informe um prontuário para consultar as atuações do EGAA.';
+        histRowsEl.innerHTML = '<div class="muted">Nenhuma consulta realizada.</div>';
+        return;
+      }}
+      const params = new URLSearchParams();
+      params.set('prontuario', prontuario);
+      if (histTipoEl.value) params.set('tipo_intervencao_id', histTipoEl.value);
+      const res = await fetch(`${{API_PREFIX}}/egaa/intervencoes?` + params.toString());
+      if (!res.ok) {{
+        histResumoEl.textContent = 'Não foi possível carregar o histórico.';
+        histRowsEl.innerHTML = '<div class="muted">Erro ao consultar intervenções.</div>';
+        return;
+      }}
+      const data = await res.json();
+      const items = Array.isArray(data) ? data : [];
+      histResumoEl.textContent = items.length
+        ? `Foram encontradas ${{items.length}} atuações para o prontuário ${{prontuario}}.`
+        : `Nenhuma atuação do EGAA encontrada para o prontuário ${{prontuario}}.`;
+      histRowsEl.innerHTML = items.length
+        ? items.slice(0, 8).map(item => `
+              <div class="card" style="padding:12px 14px;">
+              <strong style="display:block; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em;">${{item.status || 'sem status'}}</strong>
+              <div style="font-weight:700; color:var(--brand-strong);">${{item.titulo || '--'}}</div>
+              <div class="muted" style="margin-top:4px;">Tipo: ${{histTiposMap[item.tipo_intervencao_id] || item.tipo_intervencao_id || '--'}} · Responsável: ${{item.usuario_responsavel || '--'}}</div>
+              <div class="muted" style="margin-top:4px;">Atualizado em ${{item.updated_at || item.created_at || '--'}}</div>
+            </div>`).join('')
+        : '<div class="muted">Nenhuma intervenção registrada para este prontuário.</div>';
     }}
 
     filtrarBtn.addEventListener('click', () => {{ page = 1; pageSize = parseInt(document.getElementById('pageSizeSelect').value, 10) || 10; loadPacientes(); }});
@@ -896,9 +1108,25 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
     dataInicioEl.addEventListener('change', () => {{ page = 1; loadPacientes(); }});
     dataFimEl.addEventListener('change', () => {{ page = 1; loadPacientes(); }});
     minDiasEl.addEventListener('change', () => {{ page = 1; loadPacientes(); }});
+    if (prioridadeEl) prioridadeEl.addEventListener('change', () => {{ page = 1; loadPacientes(); }});
     document.getElementById('refresh').addEventListener('click', () => {{ loadPacientes(); }});
+    histBuscarBtn.addEventListener('click', () => loadHistoricoEGAA());
+    histProntuarioEl.addEventListener('keydown', (event) => {{ if (event.key === 'Enter') loadHistoricoEGAA(); }});
 
     loadPacientes();
+    if (histTipoEl) {{
+      fetch(`${{API_PREFIX}}/egaa/tipos-intervencao`)
+        .then(res => res.ok ? res.json() : [])
+        .then(items => {{
+          const list = Array.isArray(items) ? items : [];
+          histTiposMap = list.reduce((acc, item) => {{
+            acc[item.id] = item.nome || item.id;
+            return acc;
+          }}, {{}});
+          histTipoEl.innerHTML = ['<option value="">Todos</option>'].concat(list.map(item => `<option value="${{item.id}}">${{item.nome || '--'}}</option>`)).join('');
+        }})
+        .catch(() => {{}});
+    }}
   </script>
 </body>
 </html>

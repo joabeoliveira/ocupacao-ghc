@@ -14,6 +14,7 @@ class CensoKPIsResponse(BaseModel):
     total_internados: int
     longa_permanencia_15: int
     longa_permanencia_30: int
+    longa_permanencia_60_anos: int
     ocupacao_por_unidade: list[OcupacaoPorUnidade]
 
 
@@ -88,3 +89,31 @@ class EgaaIntervencaoPacienteResponse(EgaaIntervencaoPacienteCreate):
     id: int
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+
+class EgaaIntervencaoPorTipo(BaseModel):
+    tipo_intervencao_id: int
+    tipo_intervencao_nome: str
+    total: int
+
+
+class EgaaIntervencaoPorStatus(BaseModel):
+    status: str
+    total: int
+
+
+class EgaaIntervencaoPorMes(BaseModel):
+    mes: str
+    total: int
+
+
+class EgaaIndicadoresResponse(BaseModel):
+    total_intervencoes: int
+    pacientes_com_intervencao: int
+    abertas: int
+    em_andamento: int
+    concluidas: int
+    canceladas: int
+    por_status: list[EgaaIntervencaoPorStatus]
+    por_tipo: list[EgaaIntervencaoPorTipo]
+    por_mes: list[EgaaIntervencaoPorMes]

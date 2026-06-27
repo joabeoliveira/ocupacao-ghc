@@ -58,6 +58,9 @@ def get_censo_kpis(
     longa_30 = db.scalar(
         select(func.count()).select_from(base_subquery).where(base_subquery.c.dias_internacao >= 30)
     ) or 0
+    longa_60_anos = db.scalar(
+        select(func.count()).select_from(base_subquery).where(base_subquery.c.idade_anos >= 60)
+    ) or 0
 
     unidades_query = (
         select(OcupacaoLeitoGHC.unidade, func.count().label("total_pacientes"))
@@ -73,6 +76,7 @@ def get_censo_kpis(
         total_internados=total_internados,
         longa_permanencia_15=longa_15,
         longa_permanencia_30=longa_30,
+        longa_permanencia_60_anos=longa_60_anos,
         ocupacao_por_unidade=[
             OcupacaoPorUnidade(unidade=row.unidade, total_pacientes=row.total_pacientes) for row in unidades
         ],
@@ -86,6 +90,7 @@ def get_pacientes_internados(
     data_inicio: date | None = Query(default=None),
     data_fim: date | None = Query(default=None),
     min_dias: int | None = Query(default=None, ge=0),
+    idade_minima: int | None = Query(default=None, ge=0),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -97,6 +102,8 @@ def get_pacientes_internados(
         base_query = base_query.where(OcupacaoLeitoGHC.unidade == unidade)
     if min_dias is not None:
         base_query = base_query.where(OcupacaoLeitoGHC.dias_internacao >= min_dias)
+    if idade_minima is not None:
+        base_query = base_query.where(OcupacaoLeitoGHC.idade_anos >= idade_minima)
 
     total = db.scalar(select(func.count()).select_from(base_query.subquery())) or 0
 
