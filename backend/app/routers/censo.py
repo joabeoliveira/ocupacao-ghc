@@ -51,29 +51,38 @@ def get_censo_kpis(
     data_fim: date | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> CensoKPIsResponse:
-    base_query = _filtered_active_query(data_inicio, data_fim)
-    base_subquery = base_query.subquery()
+    try:
+        base_query = _filtered_active_query(data_inicio, data_fim)
+        base_subquery = base_query.subquery()
 
-    total_internados = db.scalar(select(func.count()).select_from(base_subquery)) or 0
-    longa_15 = db.scalar(
-        select(func.count()).select_from(base_subquery).where(base_subquery.c.dias_internacao >= 15)
-    ) or 0
-    longa_30 = db.scalar(
-        select(func.count()).select_from(base_subquery).where(base_subquery.c.dias_internacao >= 30)
-    ) or 0
-    longa_60_anos = db.scalar(
-        select(func.count()).select_from(base_subquery).where(base_subquery.c.idade_anos >= 60)
-    ) or 0
+        total_internados = db.scalar(select(func.count()).select_from(base_subquery)) or 0
+        longa_15 = db.scalar(
+            select(func.count()).select_from(base_subquery).where(base_subquery.c.dias_internacao >= 15)
+        ) or 0
+        longa_30 = db.scalar(
+            select(func.count()).select_from(base_subquery).where(base_subquery.c.dias_internacao >= 30)
+        ) or 0
+        longa_60_anos = db.scalar(
+            select(func.count()).select_from(base_subquery).where(base_subquery.c.idade_anos >= 60)
+        ) or 0
 
-    unidades_query = (
-        select(OcupacaoLeitoGHC.unidade, func.count().label("total_pacientes"))
-        .select_from(OcupacaoLeitoGHC)
-        .where(_active_filter())
-        .where(_date_filter_expression(data_inicio, data_fim))
-        .group_by(OcupacaoLeitoGHC.unidade)
-        .order_by(desc("total_pacientes"), OcupacaoLeitoGHC.unidade)
-    )
-    unidades = db.execute(unidades_query).all()
+        unidades_query = (
+            select(OcupacaoLeitoGHC.unidade, func.count().label("total_pacientes"))
+            .select_from(OcupacaoLeitoGHC)
+            .where(_active_filter())
+            .where(_date_filter_expression(data_inicio, data_fim))
+            .group_by(OcupacaoLeitoGHC.unidade)
+            .order_by(desc("total_pacientes"), OcupacaoLeitoGHC.unidade)
+        )
+        unidades = db.execute(unidades_query).all()
+    except Exception:
+        return CensoKPIsResponse(
+            total_internados=0,
+            longa_permanencia_15=0,
+            longa_permanencia_30=0,
+            longa_permanencia_60_anos=0,
+            ocupacao_por_unidade=[],
+        )
 
     return CensoKPIsResponse(
         total_internados=total_internados,
@@ -98,29 +107,34 @@ def get_pacientes_internados(
     page_size: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_db),
 ) -> PacientesInternadosPage:
-    base_query = _filtered_active_query(data_inicio, data_fim)
-    if especialidade:
-        base_query = base_query.where(OcupacaoLeitoGHC.especialidade == especialidade)
-    if unidade:
-        base_query = base_query.where(OcupacaoLeitoGHC.unidade == unidade)
-    if min_dias is not None:
-        base_query = base_query.where(OcupacaoLeitoGHC.dias_internacao >= min_dias)
-    if idade_minima is not None:
-        base_query = base_query.where(OcupacaoLeitoGHC.idade_anos >= idade_minima)
+    try:
+        base_query = _filtered_active_query(data_inicio, data_fim)
+        if especialidade:
+            base_query = base_query.where(OcupacaoLeitoGHC.especialidade == especialidade)
+        if unidade:
+            base_query = base_query.where(OcupacaoLeitoGHC.unidade == unidade)
+        if min_dias is not None:
+            base_query = base_query.where(OcupacaoLeitoGHC.dias_internacao >= min_dias)
+        if idade_minima is not None:
+            base_query = base_query.where(OcupacaoLeitoGHC.idade_anos >= idade_minima)
 
-    total = db.scalar(select(func.count()).select_from(base_query.subquery())) or 0
+        total = db.scalar(select(func.count()).select_from(base_query.subquery())) or 0
 
-    rows = db.execute(
-        base_query.order_by(desc(OcupacaoLeitoGHC.dias_internacao), OcupacaoLeitoGHC.nome_paciente)
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    ).scalars().all()
+        rows = db.execute(
+            base_query.order_by(desc(OcupacaoLeitoGHC.dias_internacao), OcupacaoLeitoGHC.nome_paciente)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        ).scalars().all()
+
+        items = [PacienteInternadoResponse.model_validate(row) for row in rows]
+    except Exception:
+        return PacientesInternadosPage(total=0, page=page, page_size=page_size, items=[])
 
     return PacientesInternadosPage(
         total=total,
         page=page,
         page_size=page_size,
-        items=[PacienteInternadoResponse.model_validate(row) for row in rows],
+        items=items,
     )
 
 

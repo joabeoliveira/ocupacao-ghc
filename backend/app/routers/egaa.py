@@ -88,38 +88,51 @@ def create_intervencao(
     return EgaaIntervencaoPacienteResponse.model_validate(row)
 @router.get("/indicadores", response_model=EgaaIndicadoresResponse)
 def get_indicadores(db: Session = Depends(get_db)) -> EgaaIndicadoresResponse:
-    total_intervencoes = db.scalar(select(func.count()).select_from(EgaaIntervencaoPaciente)) or 0
-    pacientes_com_intervencao = db.scalar(
-        select(func.count(func.distinct(EgaaIntervencaoPaciente.prontuario)))
-    ) or 0
+    try:
+        total_intervencoes = db.scalar(select(func.count()).select_from(EgaaIntervencaoPaciente)) or 0
+        pacientes_com_intervencao = db.scalar(
+            select(func.count(func.distinct(EgaaIntervencaoPaciente.prontuario)))
+        ) or 0
 
-    status_rows = db.execute(
-        select(EgaaIntervencaoPaciente.status, func.count().label("total"))
-        .group_by(EgaaIntervencaoPaciente.status)
-        .order_by(EgaaIntervencaoPaciente.status)
-    ).all()
-    status_map = {row.status: row.total for row in status_rows}
+        status_rows = db.execute(
+            select(EgaaIntervencaoPaciente.status, func.count().label("total"))
+            .group_by(EgaaIntervencaoPaciente.status)
+            .order_by(EgaaIntervencaoPaciente.status)
+        ).all()
+        status_map = {row.status: row.total for row in status_rows}
 
-    tipo_rows = db.execute(
-        select(
-            EgaaIntervencaoPaciente.tipo_intervencao_id,
-            EgaaTipoIntervencao.nome.label("tipo_intervencao_nome"),
-            func.count().label("total"),
+        tipo_rows = db.execute(
+            select(
+                EgaaIntervencaoPaciente.tipo_intervencao_id,
+                EgaaTipoIntervencao.nome.label("tipo_intervencao_nome"),
+                func.count().label("total"),
+            )
+            .join(EgaaTipoIntervencao, EgaaTipoIntervencao.id == EgaaIntervencaoPaciente.tipo_intervencao_id)
+            .group_by(EgaaIntervencaoPaciente.tipo_intervencao_id, EgaaTipoIntervencao.nome)
+            .order_by(desc("total"), EgaaTipoIntervencao.nome)
+        ).all()
+
+        mes_rows = db.execute(
+            select(
+                func.date_format(EgaaIntervencaoPaciente.created_at, "%Y-%m").label("mes"),
+                func.count().label("total"),
+            )
+            .where(EgaaIntervencaoPaciente.created_at.is_not(None))
+            .group_by("mes")
+            .order_by("mes")
+        ).all()
+    except Exception:
+        return EgaaIndicadoresResponse(
+            total_intervencoes=0,
+            pacientes_com_intervencao=0,
+            abertas=0,
+            em_andamento=0,
+            concluidas=0,
+            canceladas=0,
+            por_status=[],
+            por_tipo=[],
+            por_mes=[],
         )
-        .join(EgaaTipoIntervencao, EgaaTipoIntervencao.id == EgaaIntervencaoPaciente.tipo_intervencao_id)
-        .group_by(EgaaIntervencaoPaciente.tipo_intervencao_id, EgaaTipoIntervencao.nome)
-        .order_by(desc("total"), EgaaTipoIntervencao.nome)
-    ).all()
-
-    mes_rows = db.execute(
-        select(
-            func.date_format(EgaaIntervencaoPaciente.created_at, "%Y-%m").label("mes"),
-            func.count().label("total"),
-        )
-        .where(EgaaIntervencaoPaciente.created_at.is_not(None))
-        .group_by("mes")
-        .order_by("mes")
-    ).all()
 
     return EgaaIndicadoresResponse(
         total_intervencoes=total_intervencoes,
