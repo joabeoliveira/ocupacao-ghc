@@ -48,3 +48,43 @@ class UploadCensoResponse(BaseModel):
     nome_arquivo: str
     lote_importacao_id: str
     linhas_processadas: int
+
+
+class EgaaTipoIntervencaoBase(BaseModel):
+    nome: str
+    descricao: str | None = None
+    ativo: bool = True
+    ordem_exibicao: int = 0
+
+
+class EgaaTipoIntervencaoCreate(EgaaTipoIntervencaoBase):
+    pass
+
+
+class EgaaTipoIntervencaoResponse(EgaaTipoIntervencaoBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class EgaaIntervencaoPacienteCreate(BaseModel):
+    ocupacao_leito_id: int | None = None
+    prontuario: str
+    tipo_intervencao_id: int
+    titulo: str
+    descricao: str | None = None
+    status: str = "aberta"
+    usuario_responsavel: str | None = None
+    data_prevista: date | None = None
+    data_conclusao: datetime | None = None
+    observacao: str | None = None
+
+
+class EgaaIntervencaoPacienteResponse(EgaaIntervencaoPacienteCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    created_at: datetime | None = None
+    updated_at: datetime | None = None

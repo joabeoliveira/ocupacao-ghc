@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import CHAR, Date, DateTime, Integer, String, Text
+from sqlalchemy import CHAR, Boolean, Date, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.mysql import ENUM
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -37,3 +37,46 @@ class OcupacaoLeitoGHC(Base):
     periodo_referencia_fim: Mapped[date | None] = mapped_column(Date, nullable=True)
     data_impressao_arquivo: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class EgaaTipoIntervencao(Base):
+    __tablename__ = "egaa_tipo_intervencao"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    nome: Mapped[str] = mapped_column(String(120), nullable=False, unique=True, index=True)
+    descricao: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
+    ordem_exibicao: Mapped[int] = mapped_column(Integer, nullable=False, default=0, index=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class EgaaIntervencaoPaciente(Base):
+    __tablename__ = "egaa_intervencao_paciente"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ocupacao_leito_id: Mapped[int | None] = mapped_column(
+        ForeignKey("ocupacao_leitos_ghc.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    prontuario: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    tipo_intervencao_id: Mapped[int] = mapped_column(
+        ForeignKey("egaa_tipo_intervencao.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    titulo: Mapped[str] = mapped_column(String(150), nullable=False)
+    descricao: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(
+        ENUM("aberta", "em_andamento", "concluida", "cancelada"),
+        nullable=False,
+        default="aberta",
+        index=True,
+    )
+    usuario_responsavel: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    data_prevista: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    data_conclusao: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    observacao: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

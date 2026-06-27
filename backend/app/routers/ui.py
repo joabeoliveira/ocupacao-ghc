@@ -310,6 +310,7 @@ def dashboard_page() -> str:
         <a class="primary" href="/dashboard">Dashboard</a>
         <a href="/pacientes">Pacientes</a>
         <a href="/longa-permanencia">Longa Permanência</a>
+        <a href="/configuracoes">Configurações</a>
         <a href="/upload">Importações</a>
         <a href="#resumo">Resumo</a>
       </nav>
@@ -327,6 +328,7 @@ def dashboard_page() -> str:
           </div>
           <div class="header-actions">
             <a class="pill-link" href="/upload">Ir para Upload</a>
+            <a class="pill-link" href="/configuracoes">Configurações EGAA</a>
           </div>
         </div>
 
@@ -556,6 +558,7 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
         ("Dashboard", "/dashboard", title == "Dashboard"),
         ("Pacientes", "/pacientes", title == "Pacientes"),
         ("Longa Permanência", "/longa-permanencia", title == "Longa Permanência"),
+        ("Configurações", "/configuracoes", title == "Configurações"),
         ("Importações", "/upload", False),
     ]
     nav_html = "".join(
@@ -917,3 +920,509 @@ def longa_permanencia_route() -> str:
         "Pacientes com 15+ dias de internação para acompanhamento prioritário.",
         default_min_dias=15,
     )
+
+
+@router.get("/configuracoes", response_class=HTMLResponse)
+def configuracoes_route() -> str:
+    return """
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EGAA - Configurações</title>
+  <style>
+    :root {
+      --bg: #F7F9FB;
+      --panel: #FFFFFF;
+      --panel-border: #DCE3EA;
+      --text: #1F2937;
+      --muted: #6B7280;
+      --brand: #005C99;
+      --brand-strong: #004A7A;
+      --secondary: #00A79D;
+      --success: #2E7D32;
+      --warning: #F9A825;
+      --error: #C62828;
+      --info: #0288D1;
+    }
+    body {
+      font-family: Inter, Arial, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(0, 92, 153, 0.08), transparent 28%),
+        linear-gradient(180deg, #ffffff 0%, var(--bg) 100%);
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+    }
+    .layout { display:grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+    .sidebar {
+      background: rgba(255,255,255,0.84);
+      backdrop-filter: blur(10px);
+      border-right: 1px solid var(--panel-border);
+      padding: 24px 18px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      box-sizing: border-box;
+    }
+    .brand { font-size: 18px; font-weight: 700; color: var(--brand-strong); margin: 0; }
+    .brand-subtitle { margin: 6px 0 18px; color: var(--muted); font-size: 13px; }
+    .nav { display:flex; flex-direction:column; gap:8px; margin-top: 18px; }
+    .nav a {
+      color: var(--text);
+      text-decoration: none;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      font-weight: 600;
+    }
+    .nav a:hover { background: rgba(0, 92, 153, 0.06); border-color: var(--panel-border); }
+    .nav a.primary { background: var(--brand); color: #fff; }
+    .nav a.primary:hover { background: var(--brand-strong); border-color: transparent; }
+    .sidebar-note {
+      margin-top: 18px;
+      padding: 12px;
+      border-radius: 12px;
+      background: #F0F7FC;
+      border: 1px solid #D7E7F3;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .main { padding: 24px; }
+    .shell { max-width: 1240px; margin: 0 auto; }
+    .header { display:flex; align-items:center; justify-content:space-between; gap: 16px; margin-bottom: 16px; }
+    h1 { color:var(--brand-strong); margin:0; letter-spacing:-0.02em; }
+    .subtitle { margin: 8px 0 0; color: var(--muted); }
+    .header-actions { display:flex; gap: 10px; flex-wrap:wrap; align-items:center; }
+    .pill-link {
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:10px 12px;
+      border-radius: 999px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      color: var(--brand);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .badge {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .02em;
+      margin-bottom: 10px;
+    }
+    .badge-info { background: rgba(2, 136, 209, 0.12); color: var(--info); }
+    .badge-secondary { background: rgba(0, 167, 157, 0.12); color: var(--secondary); }
+    .badge-warning { background: rgba(249, 168, 37, 0.16); color: #8A6500; }
+    .badge-success { background: rgba(46, 125, 50, 0.12); color: var(--success); }
+    .cards { display:grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap:12px; margin-top:16px; }
+    .card {
+      background:var(--panel);
+      padding:14px 16px;
+      border-radius:14px;
+      box-shadow:0 8px 24px rgba(16,24,40,0.08);
+      border:1px solid var(--panel-border);
+      min-width:0;
+    }
+    .card strong { display:block; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
+    .kpi-value { font-size:28px; font-weight:700; color:var(--brand-strong); line-height:1.1; }
+    .grid { display:grid; grid-template-columns: 1.1fr 1.1fr; gap: 16px; margin-top: 16px; }
+    .section {
+      background:var(--panel);
+      border:1px solid var(--panel-border);
+      border-radius:14px;
+      box-shadow:0 8px 24px rgba(16,24,40,0.08);
+      overflow:hidden;
+    }
+    .section-header {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:14px 16px;
+      border-bottom:1px solid #edf2f7;
+    }
+    .section-header h2 { margin:0; font-size:16px; color:var(--brand-strong); }
+    .section-header p { margin:4px 0 0; color:var(--muted); font-size:13px; }
+    .section-body { padding: 16px; }
+    .field { display:flex; flex-direction:column; gap:6px; margin-bottom: 12px; }
+    .field label { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; }
+    .field input, .field textarea, .field select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #cfd8e3;
+      box-sizing: border-box;
+      background: #fff;
+      font: inherit;
+    }
+    .field textarea { min-height: 96px; resize: vertical; }
+    .row { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top: 12px; }
+    button {
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: none;
+      background: var(--brand);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.secondary {
+      background: #EEF5FA;
+      color: var(--brand);
+      border: 1px solid var(--panel-border);
+    }
+    button:disabled { opacity: .65; cursor: not-allowed; }
+    table { width:100%; border-collapse:collapse; margin-top:4px; background:transparent; }
+    th, td { padding:10px 8px; border-bottom:1px solid #edf2f7; text-align:left; vertical-align: top; }
+    th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+    .muted { color:var(--muted); }
+    .pill { display:inline-flex; align-items:center; padding:4px 8px; border-radius:999px; font-size:12px; font-weight:700; }
+    .pill.active { background: rgba(46, 125, 50, 0.12); color: var(--success); }
+    .pill.inactive { background: rgba(198, 40, 40, 0.12); color: var(--error); }
+    .full { grid-column: 1 / -1; }
+    @media (max-width: 1100px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--panel-border); }
+      .grid { grid-template-columns: 1fr; }
+      .row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <p class="brand">EGAA</p>
+      <p class="brand-subtitle">Painel de regulação e censo</p>
+      <nav class="nav">
+        <a href="/dashboard">Dashboard</a>
+        <a href="/pacientes">Pacientes</a>
+        <a href="/longa-permanencia">Longa Permanência</a>
+        <a class="primary" href="/configuracoes">Configurações</a>
+        <a href="/upload">Importações</a>
+      </nav>
+      <div class="sidebar-note">
+        Parametrização do fluxo operacional, com tipos de intervenção e registro rápido para acompanhamento da equipe.
+      </div>
+    </aside>
+    <main class="main">
+      <div class="shell">
+        <div class="header">
+          <div>
+            <h1>Configurações EGAA</h1>
+            <p class="subtitle">Administre tipos de intervenção e registre ações operacionais diretamente pela interface.</p>
+          </div>
+          <div class="header-actions">
+            <a class="pill-link" href="/dashboard">Voltar ao dashboard</a>
+            <a class="pill-link" href="/longa-permanencia">Abrir longa permanência</a>
+          </div>
+        </div>
+
+        <div class="cards" id="kpis">
+          <div class="card"><span class="badge badge-info">Tipos</span><strong>Cadastrados</strong><div class="kpi-value">--</div></div>
+          <div class="card"><span class="badge badge-secondary">Ativos</span><strong>Disponíveis</strong><div class="kpi-value">--</div></div>
+          <div class="card"><span class="badge badge-warning">Intervenções</span><strong>Registradas</strong><div class="kpi-value">--</div></div>
+        </div>
+
+        <div class="grid">
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <h2>Novo tipo de intervenção</h2>
+                <p>Use esta área para manter o catálogo do EGAA organizado.</p>
+              </div>
+            </div>
+            <div class="section-body">
+              <form id="tipoForm">
+                <div class="field">
+                  <label for="tipoNome">Nome</label>
+                  <input id="tipoNome" required placeholder="Ex: Evolução EGAA" />
+                </div>
+                <div class="field">
+                  <label for="tipoDescricao">Descrição</label>
+                  <textarea id="tipoDescricao" placeholder="Descreva o uso deste tipo de intervenção"></textarea>
+                </div>
+                <div class="row">
+                  <div class="field">
+                    <label for="tipoOrdem">Ordem</label>
+                    <input id="tipoOrdem" type="number" min="0" step="1" value="0" />
+                  </div>
+                  <div class="field">
+                    <label for="tipoAtivo">Status</label>
+                    <select id="tipoAtivo">
+                      <option value="true">Ativo</option>
+                      <option value="false">Inativo</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="actions">
+                  <button type="submit">Salvar tipo</button>
+                  <button type="button" class="secondary" id="reloadTipos">Recarregar</button>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <h2>Registro rápido de intervenção</h2>
+                <p>Fluxo operacional mínimo para registrar uma ação no paciente.</p>
+              </div>
+            </div>
+            <div class="section-body">
+              <form id="intervencaoForm">
+                <div class="row">
+                  <div class="field">
+                    <label for="ocupacaoLeitoId">Ocupação do leito</label>
+                    <input id="ocupacaoLeitoId" type="number" min="1" step="1" placeholder="Opcional" />
+                  </div>
+                  <div class="field">
+                    <label for="prontuario">Prontuário</label>
+                    <input id="prontuario" required placeholder="Número do prontuário" />
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="field">
+                    <label for="tipoIntervencaoId">Tipo de intervenção</label>
+                    <select id="tipoIntervencaoId" required>
+                      <option value="">Carregando...</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="statusIntervencao">Status</label>
+                    <select id="statusIntervencao">
+                      <option value="aberta">Aberta</option>
+                      <option value="em_andamento">Em andamento</option>
+                      <option value="concluida">Concluída</option>
+                      <option value="cancelada">Cancelada</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="tituloIntervencao">Título</label>
+                  <input id="tituloIntervencao" required placeholder="Ex: Pendência para alta" />
+                </div>
+                <div class="field">
+                  <label for="descricaoIntervencao">Descrição</label>
+                  <textarea id="descricaoIntervencao" placeholder="Detalhe a intervenção ou a pendência"></textarea>
+                </div>
+                <div class="row">
+                  <div class="field">
+                    <label for="responsavelIntervencao">Responsável</label>
+                    <input id="responsavelIntervencao" placeholder="Nome do profissional" />
+                  </div>
+                  <div class="field">
+                    <label for="dataPrevistaIntervencao">Data prevista</label>
+                    <input id="dataPrevistaIntervencao" type="date" />
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="field">
+                    <label for="dataConclusaoIntervencao">Data de conclusão</label>
+                    <input id="dataConclusaoIntervencao" type="datetime-local" />
+                  </div>
+                  <div class="field">
+                    <label for="observacaoIntervencao">Observação</label>
+                    <input id="observacaoIntervencao" placeholder="Campo livre" />
+                  </div>
+                </div>
+                <div class="actions">
+                  <button type="submit">Salvar intervenção</button>
+                  <button type="button" class="secondary" id="reloadIntervencoes">Recarregar</button>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <section class="section full">
+            <div class="section-header">
+              <div>
+                <h2>Tipos cadastrados</h2>
+                <p>Catálogo disponível para uso no registro operacional.</p>
+              </div>
+            </div>
+            <div class="section-body">
+              <table>
+                <thead>
+                  <tr><th>Nome</th><th>Descrição</th><th>Ordem</th><th>Status</th></tr>
+                </thead>
+                <tbody id="tiposRows">
+                  <tr><td colspan="4" class="muted">Aguardando dados...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="section full">
+            <div class="section-header">
+              <div>
+                <h2>Intervenções recentes</h2>
+                <p>Últimos registros realizados pelo EGAA.</p>
+              </div>
+            </div>
+            <div class="section-body">
+              <table>
+                <thead>
+                  <tr><th>Prontuário</th><th>Título</th><th>Tipo</th><th>Status</th><th>Responsável</th><th>Atualizado</th></tr>
+                </thead>
+                <tbody id="intervencoesRows">
+                  <tr><td colspan="6" class="muted">Aguardando dados...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const API_PREFIX = '/api';
+    const kpisEl = document.getElementById('kpis');
+    const tiposRowsEl = document.getElementById('tiposRows');
+    const intervencoesRowsEl = document.getElementById('intervencoesRows');
+    const tipoForm = document.getElementById('tipoForm');
+    const intervencaoForm = document.getElementById('intervencaoForm');
+    const tipoIntervencaoId = document.getElementById('tipoIntervencaoId');
+
+    function fmtDate(value) {
+      if (!value) return '--';
+      try {
+        return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
+      } catch {
+        return String(value);
+      }
+    }
+
+    async function loadTipos() {
+      const res = await fetch(`${API_PREFIX}/egaa/tipos-intervencao`);
+      if (!res.ok) {
+        tiposRowsEl.innerHTML = '<tr><td colspan="4" class="muted">Erro ao carregar tipos.</td></tr>';
+        return [];
+      }
+      const items = await res.json();
+      const list = Array.isArray(items) ? items : [];
+      tiposRowsEl.innerHTML = list.length
+        ? list.map(item => `
+            <tr>
+              <td><strong>${item.nome || '--'}</strong></td>
+              <td>${item.descricao || '<span class="muted">Sem descrição</span>'}</td>
+              <td>${item.ordem_exibicao ?? 0}</td>
+              <td><span class="pill ${item.ativo ? 'active' : 'inactive'}">${item.ativo ? 'Ativo' : 'Inativo'}</span></td>
+            </tr>`).join('')
+        : '<tr><td colspan="4" class="muted">Nenhum tipo cadastrado.</td></tr>';
+      tipoIntervencaoId.innerHTML = list.length
+        ? ['<option value="">Selecione...</option>'].concat(list.map(item => `<option value="${item.id}">${item.nome || '--'}</option>`)).join('')
+        : '<option value="">Nenhum tipo disponível</option>';
+      return list;
+    }
+
+    async function loadIntervencoes(tiposById = {}) {
+      const res = await fetch(`${API_PREFIX}/egaa/intervencoes`);
+      if (!res.ok) {
+        intervencoesRowsEl.innerHTML = '<tr><td colspan="6" class="muted">Erro ao carregar intervenções.</td></tr>';
+        return [];
+      }
+      const items = await res.json();
+      const list = Array.isArray(items) ? items : [];
+      intervencoesRowsEl.innerHTML = list.length
+          ? list.slice(0, 10).map(item => `
+            <tr>
+              <td>${item.prontuario || '--'}</td>
+              <td><strong>${item.titulo || '--'}</strong><div class="muted">${item.descricao || ''}</div></td>
+              <td>${tiposById[item.tipo_intervencao_id] || item.tipo_intervencao_id || '--'}</td>
+              <td>${item.status || '--'}</td>
+              <td>${item.usuario_responsavel || '--'}</td>
+              <td>${fmtDate(item.updated_at || item.created_at)}</td>
+            </tr>`).join('')
+        : '<tr><td colspan="6" class="muted">Nenhuma intervenção registrada.</td></tr>';
+      return list;
+    }
+
+    function refreshKPIs(tipos, intervencoes) {
+      const ativos = tipos.filter(item => item.ativo).length;
+      kpisEl.innerHTML = `
+        <div class="card"><span class="badge badge-info">Tipos</span><strong>Cadastrados</strong><div class="kpi-value">${tipos.length}</div></div>
+        <div class="card"><span class="badge badge-secondary">Ativos</span><strong>Disponíveis</strong><div class="kpi-value">${ativos}</div></div>
+        <div class="card"><span class="badge badge-warning">Intervenções</span><strong>Registradas</strong><div class="kpi-value">${intervencoes.length}</div></div>
+      `;
+    }
+
+    async function reloadAll() {
+      const tipos = await loadTipos();
+      const tiposById = tipos.reduce((acc, item) => {
+        acc[item.id] = item.nome || item.id;
+        return acc;
+      }, {});
+      const intervencoes = await loadIntervencoes(tiposById);
+      refreshKPIs(tipos, intervencoes);
+    }
+
+    tipoForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const payload = {
+        nome: document.getElementById('tipoNome').value.trim(),
+        descricao: document.getElementById('tipoDescricao').value.trim() || null,
+        ativo: document.getElementById('tipoAtivo').value === 'true',
+        ordem_exibicao: Number(document.getElementById('tipoOrdem').value || 0),
+      };
+      const res = await fetch(`${API_PREFIX}/egaa/tipos-intervencao`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        alert('Não foi possível salvar o tipo de intervenção.');
+        return;
+      }
+      tipoForm.reset();
+      document.getElementById('tipoOrdem').value = 0;
+      document.getElementById('tipoAtivo').value = 'true';
+      await reloadAll();
+    });
+
+    intervencaoForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const payload = {
+        ocupacao_leito_id: document.getElementById('ocupacaoLeitoId').value ? Number(document.getElementById('ocupacaoLeitoId').value) : null,
+        prontuario: document.getElementById('prontuario').value.trim(),
+        tipo_intervencao_id: Number(tipoIntervencaoId.value),
+        titulo: document.getElementById('tituloIntervencao').value.trim(),
+        descricao: document.getElementById('descricaoIntervencao').value.trim() || null,
+        status: document.getElementById('statusIntervencao').value,
+        usuario_responsavel: document.getElementById('responsavelIntervencao').value.trim() || null,
+        data_prevista: document.getElementById('dataPrevistaIntervencao').value || null,
+        data_conclusao: document.getElementById('dataConclusaoIntervencao').value ? `${document.getElementById('dataConclusaoIntervencao').value}:00` : null,
+        observacao: document.getElementById('observacaoIntervencao').value.trim() || null,
+      };
+      const res = await fetch(`${API_PREFIX}/egaa/intervencoes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        alert('Não foi possível salvar a intervenção.');
+        return;
+      }
+      intervencaoForm.reset();
+      await reloadAll();
+    });
+
+    document.getElementById('reloadTipos').addEventListener('click', reloadAll);
+    document.getElementById('reloadIntervencoes').addEventListener('click', reloadAll);
+
+    reloadAll();
+  </script>
+</body>
+</html>
+"""

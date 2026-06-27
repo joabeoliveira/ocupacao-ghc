@@ -45,6 +45,7 @@ As rotas principais da interface web são:
 - `/dashboard` ou `/` redirecionado para `dashboard`
 - `/pacientes` para a lista filtrável de internações
 - `/longa-permanencia` para foco em pacientes com `15+` dias
+- `/configuracoes` para parametrizar tipos de intervenção e registrar ações do EGAA
 - `/upload` para envio manual de arquivos
 
 Uso recomendado:
@@ -71,7 +72,7 @@ Esses checks protegem principalmente parsing, normalização, geração de hash 
 2. Verificar logs do contêiner após o build.
 3. Acessar `GET /health`.
 4. Comparar `GET /api/censo/kpis` com a seção de KPIs do script de auditoria.
-5. Abrir `/dashboard`, `/pacientes` e `/longa-permanencia` para confirmar navegação e filtros.
+5. Abrir `/dashboard`, `/pacientes`, `/longa-permanencia` e `/configuracoes` para confirmar navegação e filtros.
 6. Abrir `/upload` e testar um upload pequeno de censo, se aplicável.
 7. Revisar se novos uploads não criam duplicidades inesperadas.
 
@@ -84,4 +85,4 @@ Considere o MVP concluído quando:
 - API responde com dados coerentes do banco populado.
 - Deploy está documentado e reproduzível.
 - O fluxo de upload diário está validado para uso operacional.
-- As rotas `/dashboard`, `/pacientes`, `/longa-permanencia` e `/upload` estão funcionais e alinhadas ao design-system.
+- As rotas `/dashboard`, `/pacientes`, `/longa-permanencia`, `/configuracoes` e `/upload` estão funcionais e alinhadas ao design-system.
