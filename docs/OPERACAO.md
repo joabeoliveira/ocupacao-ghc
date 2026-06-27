@@ -8,6 +8,16 @@ Este guia consolida os passos finais para homologar o MVP depois que o banco `oc
 - Migration `migrations/001_create_ocupacao_leitos_esusreport.sql` aplicada no banco.
 - Dados históricos e/ou censo diário já carregados pelo ETL.
 
+## 1.1 Aplicação de migrations
+
+Para aplicar as tabelas novas do EGAA, use o runner local:
+
+```bash
+python scripts/apply_migrations.py
+```
+
+O script cria a tabela `schema_migrations`, aplica os arquivos `.sql` em ordem e registra o que já foi executado.
+
 ## 2. Auditoria do banco populado
 
 Execute `scripts/auditoria_ocupacao_leitos.sql` no MySQL de produção ou homologação. A revisão deve confirmar:
