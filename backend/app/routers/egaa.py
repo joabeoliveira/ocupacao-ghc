@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from app.database import get_db
 from app.models import EgaaIntervencaoPaciente, EgaaTipoIntervencao
 from app.schemas import (
+    EgaaIntervencaoPacienteBatchCreate,
     EgaaIntervencaoPacienteCreate,
     EgaaIntervencaoPacienteResponse,
     EgaaIndicadoresResponse,
@@ -86,6 +87,47 @@ def create_intervencao(
     db.commit()
     db.refresh(row)
     return EgaaIntervencaoPacienteResponse.model_validate(row)
+
+
+@router.post("/intervencoes/lote", response_model=list[EgaaIntervencaoPacienteResponse], status_code=201)
+def create_intervencoes_lote(
+    payload: EgaaIntervencaoPacienteBatchCreate,
+    db: Session = Depends(get_db),
+) -> list[EgaaIntervencaoPacienteResponse]:
+    if not payload.items:
+        raise HTTPException(status_code=400, detail="Informe ao menos uma atuação.")
+
+    tipos_cache: dict[int, EgaaTipoIntervencao | None] = {}
+    rows: list[EgaaIntervencaoPaciente] = []
+
+    try:
+        for item in payload.items:
+            tipo = tipos_cache.get(item.tipo_intervencao_id)
+            if item.tipo_intervencao_id not in tipos_cache:
+                tipo = db.scalar(
+                    select(EgaaTipoIntervencao).where(EgaaTipoIntervencao.id == item.tipo_intervencao_id)
+                )
+                tipos_cache[item.tipo_intervencao_id] = tipo
+            if tipo is None:
+                raise HTTPException(status_code=404, detail="Tipo de intervenção não encontrado.")
+
+            row = EgaaIntervencaoPaciente(**item.model_dump())
+            db.add(row)
+            rows.append(row)
+
+        db.commit()
+        for row in rows:
+            db.refresh(row)
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:  # pragma: no cover - defensive guard for production
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Não foi possível salvar as atuações em lote.") from exc
+
+    return [EgaaIntervencaoPacienteResponse.model_validate(row) for row in rows]
+
+
 @router.get("/indicadores", response_model=EgaaIndicadoresResponse)
 def get_indicadores(db: Session = Depends(get_db)) -> EgaaIndicadoresResponse:
     try:

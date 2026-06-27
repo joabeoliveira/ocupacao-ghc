@@ -158,6 +158,18 @@ Transformar a área de longa permanência do EGAA em um fluxo operacional comple
 - Critério de aceite:
   - o time consegue rastrear pendências abertas e encerradas.
 
+### BT-E3.4 - Registro em lote de atuações por paciente
+- Objetivo: permitir registrar várias atuações do EGAA para o mesmo prontuário em uma única operação.
+- Tarefas:
+  - montar formulário com múltiplos cartões de atuação;
+  - salvar todas as atuações em lote;
+  - manter o vínculo 1 paciente -> N atuações;
+  - atualizar a linha do tempo após o envio.
+- Dependência: BT-E3.1 e BT-E3.2.
+- Critério de aceite:
+  - o usuário consegue registrar várias atuações para um paciente sem duplicar cadastro de paciente;
+  - o histórico mostra todas as ações gravadas.
+
 ---
 
 ## Épico 4. Configurações EGAA
@@ -250,7 +262,7 @@ Transformar a área de longa permanência do EGAA em um fluxo operacional comple
 
 1. BT-E1.1, BT-E1.2 e BT-E1.3
 2. BT-E2.1, BT-E2.2 e BT-E2.3
-3. BT-E3.1, BT-E3.2 e BT-E3.3
+3. BT-E3.1, BT-E3.2, BT-E3.3 e BT-E3.4
 4. BT-E4.1 e BT-E4.2
 5. BT-E2.4 e BT-E2.5
 6. BT-E5.1 e BT-E5.2

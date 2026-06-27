@@ -1246,6 +1246,27 @@ def paciente_detail_route(prontuario: str) -> str:
     .field textarea {{ min-height: 92px; resize: vertical; }}
     .row {{ display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }}
     .actions {{ display:flex; gap:8px; flex-wrap:wrap; margin-top: 12px; }}
+    .drafts {{ display:flex; flex-direction:column; gap:12px; margin-bottom: 12px; }}
+    .draft-card {{
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      background: linear-gradient(180deg, #ffffff 0%, #fafdff 100%);
+      padding: 14px;
+      box-shadow: 0 4px 16px rgba(16,24,40,0.04);
+    }}
+    .draft-card-header {{ display:flex; align-items:center; justify-content:space-between; gap: 12px; margin-bottom: 12px; }}
+    .draft-card-header strong {{ color: var(--brand-strong); }}
+    .draft-card-header small {{ color: var(--muted); display:block; margin-top: 2px; }}
+    .draft-grid {{ display:grid; grid-template-columns: 1.1fr 1.1fr; gap: 12px; }}
+    .draft-actions {{ display:flex; gap:8px; flex-wrap:wrap; margin-top: 12px; }}
+    .draft-remove {{ background: #FDECEC; color: var(--error); border: 1px solid rgba(198, 40, 40, 0.16); }}
+    .draft-empty {{
+      border: 1px dashed var(--panel-border);
+      border-radius: 12px;
+      padding: 16px;
+      color: var(--muted);
+      background: #FBFDFF;
+    }}
     button {{
       padding:10px 12px; border-radius:8px; border:none; background:var(--brand); color:#fff; cursor:pointer; font-weight:600;
     }}
@@ -1322,52 +1343,19 @@ def paciente_detail_route(prontuario: str) -> str:
             <div class="section-header">
               <div>
                 <h2>Nova atuação EGAA</h2>
-                <p>Registre evolução, pendência ou intervenção.</p>
+                <p>Adicione várias atuações para o mesmo paciente antes de salvar.</p>
               </div>
             </div>
             <div class="section-body">
               <form id="intervencaoForm">
-                <div class="field">
-                  <label for="tipoIntervencaoId">Tipo de intervenção</label>
-                  <select id="tipoIntervencaoId" required>
-                    <option value="">Carregando...</option>
-                  </select>
+                <div class="actions" style="margin-top:0">
+                  <button type="button" class="secondary" id="adicionarAtuacao">Adicionar atuação</button>
+                  <button type="button" class="secondary" id="limparAtuacoes">Limpar tudo</button>
                 </div>
-                <div class="field">
-                  <label for="titulo">Título</label>
-                  <input id="titulo" required placeholder="Ex: Pendência para alta" />
-                </div>
-                <div class="field">
-                  <label for="descricao">Descrição</label>
-                  <textarea id="descricao" placeholder="Detalhe a atuação do EGAA"></textarea>
-                </div>
-                <div class="row">
-                  <div class="field">
-                    <label for="status">Status</label>
-                    <select id="status">
-                      <option value="aberta">Aberta</option>
-                      <option value="em_andamento">Em andamento</option>
-                      <option value="concluida">Concluída</option>
-                      <option value="cancelada">Cancelada</option>
-                    </select>
-                  </div>
-                  <div class="field">
-                    <label for="responsavel">Responsável</label>
-                    <input id="responsavel" placeholder="Nome do profissional" />
-                  </div>
-                </div>
-                <div class="row">
-                  <div class="field">
-                    <label for="dataPrevista">Data prevista</label>
-                    <input id="dataPrevista" type="date" />
-                  </div>
-                  <div class="field">
-                    <label for="observacao">Observação</label>
-                    <input id="observacao" placeholder="Campo livre" />
-                  </div>
-                </div>
+                <p class="muted" style="margin:10px 0 12px;">Cada cartão representa uma atuação do EGAA. Você pode registrar quantas forem necessárias para este prontuário.</p>
+                <div class="drafts" id="drafts"></div>
                 <div class="actions">
-                  <button type="submit">Salvar atuação</button>
+                  <button type="submit">Salvar todas as atuações</button>
                   <button type="button" class="secondary" id="recarregar">Recarregar</button>
                 </div>
               </form>
@@ -1399,8 +1387,127 @@ def paciente_detail_route(prontuario: str) -> str:
     const kpisEl = document.getElementById('kpis');
     const timelineEl = document.getElementById('timeline');
     const subtituloEl = document.getElementById('subtitulo');
-    const tipoIntervencaoIdEl = document.getElementById('tipoIntervencaoId');
+    const draftsEl = document.getElementById('drafts');
     const form = document.getElementById('intervencaoForm');
+    const adicionarAtuacaoBtn = document.getElementById('adicionarAtuacao');
+    const limparAtuacoesBtn = document.getElementById('limparAtuacoes');
+    let tiposOptions = [];
+    let tiposById = {{}};
+    let draftSeq = 0;
+    let drafts = [];
+
+    function escapeHtml(value) {{
+      return String(value ?? '').replace(/[&<>"']/g, (character) => ({{
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      }}[character] || character));
+    }}
+
+    function renderTipoOptions(selectedValue) {{
+      const selected = selectedValue ? String(selectedValue) : '';
+      const options = ['<option value="">Selecione...</option>'].concat(
+        tiposOptions.map(item => `<option value="${{item.id}}" ${{String(item.id) === selected ? 'selected' : ''}}>${{escapeHtml(item.nome || '--')}}</option>`)
+      );
+      return options.join('');
+    }}
+
+    function createDraft() {{
+      draftSeq += 1;
+      return {{
+        id: `${{Date.now()}}-${{draftSeq}}`,
+        tipo_intervencao_id: '',
+        titulo: '',
+        descricao: '',
+        status: 'aberta',
+        usuario_responsavel: '',
+        data_prevista: '',
+        data_conclusao: '',
+        observacao: '',
+      }};
+    }}
+
+    function renderDrafts() {{
+      if (!drafts.length) {{
+        draftsEl.innerHTML = '<div class="draft-empty">Nenhuma atuação adicionada ainda. Use "Adicionar atuação" para montar o lote.</div>';
+        return;
+      }}
+      draftsEl.innerHTML = drafts.map((draft, index) => `
+        <article class="draft-card" data-index="${{index}}">
+          <div class="draft-card-header">
+            <div>
+              <strong>Atuação ${{index + 1}}</strong>
+              <small>Preencha os campos e salve tudo de uma vez.</small>
+            </div>
+            <button type="button" class="draft-remove" data-action="remove-draft" data-index="${{index}}">Remover</button>
+          </div>
+          <div class="field">
+            <label>Tipo de intervenção</label>
+            <select data-field="tipo_intervencao_id" data-index="${{index}}" required>
+              ${{renderTipoOptions(draft.tipo_intervencao_id)}}
+            </select>
+          </div>
+          <div class="field">
+            <label>Título</label>
+            <input data-field="titulo" data-index="${{index}}" required placeholder="Ex: Pendência para alta" value="${{escapeHtml(draft.titulo || '')}}" />
+          </div>
+          <div class="field">
+            <label>Descrição</label>
+            <textarea data-field="descricao" data-index="${{index}}" placeholder="Detalhe a atuação do EGAA">${{escapeHtml(draft.descricao || '')}}</textarea>
+          </div>
+          <div class="draft-grid">
+            <div class="field">
+              <label>Status</label>
+              <select data-field="status" data-index="${{index}}">
+                <option value="aberta" ${{draft.status === 'aberta' ? 'selected' : ''}}>Aberta</option>
+                <option value="em_andamento" ${{draft.status === 'em_andamento' ? 'selected' : ''}}>Em andamento</option>
+                <option value="concluida" ${{draft.status === 'concluida' ? 'selected' : ''}}>Concluída</option>
+                <option value="cancelada" ${{draft.status === 'cancelada' ? 'selected' : ''}}>Cancelada</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Responsável</label>
+              <input data-field="usuario_responsavel" data-index="${{index}}" placeholder="Nome do profissional" value="${{escapeHtml(draft.usuario_responsavel || '')}}" />
+            </div>
+          </div>
+          <div class="draft-grid">
+            <div class="field">
+              <label>Data prevista</label>
+              <input data-field="data_prevista" data-index="${{index}}" type="date" value="${{draft.data_prevista || ''}}" />
+            </div>
+            <div class="field">
+              <label>Data de conclusão</label>
+              <input data-field="data_conclusao" data-index="${{index}}" type="datetime-local" value="${{draft.data_conclusao || ''}}" />
+            </div>
+          </div>
+            <div class="field">
+              <label>Observação</label>
+              <input data-field="observacao" data-index="${{index}}" placeholder="Campo livre" value="${{escapeHtml(draft.observacao || '')}}" />
+            </div>
+        </article>
+      `).join('');
+    }}
+
+    function syncDraftField(index, field, value) {{
+      const draft = drafts[index];
+      if (!draft) return;
+      draft[field] = value;
+    }}
+
+    function addDraft() {{
+      drafts.push(createDraft());
+      renderDrafts();
+    }}
+
+    function removeDraft(index) {{
+      drafts.splice(index, 1);
+      if (!drafts.length) {{
+        drafts.push(createDraft());
+      }}
+      renderDrafts();
+    }}
 
     function fmtDate(value) {{
       if (!value) return '--';
@@ -1440,14 +1547,18 @@ def paciente_detail_route(prontuario: str) -> str:
     async function loadTipos() {{
       const res = await fetch(`${{API_PREFIX}}/egaa/tipos-intervencao`);
       if (!res.ok) {{
-        tipoIntervencaoIdEl.innerHTML = '<option value="">Erro ao carregar</option>';
+        tiposOptions = [];
+        tiposById = {{}};
         return [];
       }}
       const items = await res.json();
       const list = Array.isArray(items) ? items : [];
-      tipoIntervencaoIdEl.innerHTML = ['<option value="">Selecione...</option>'].concat(
-        list.map(item => `<option value="${{item.id}}">${{item.nome || '--'}}</option>`)
-      ).join('');
+      tiposById = list.reduce((acc, item) => {{
+        acc[item.id] = item.nome || item.id;
+        return acc;
+      }}, {{}});
+      tiposOptions = list;
+      renderDrafts();
       return list;
     }}
 
@@ -1459,48 +1570,122 @@ def paciente_detail_route(prontuario: str) -> str:
       }}
       const items = await res.json();
       const list = Array.isArray(items) ? items : [];
-      timelineEl.innerHTML = list.length ? list.map(item => `
+      timelineEl.innerHTML = list.length ? list.map(item => {{
+        const tipoNome = escapeHtml(tiposById[item.tipo_intervencao_id] || ('ID ' + (item.tipo_intervencao_id || '--')));
+        return `
         <div class="timeline-item">
-          <div class="badge badge-info">${{item.status || 'sem status'}}</div>
-          <div class="timeline-title">${{item.titulo || '--'}}</div>
-          <div class="timeline-meta">Tipo ID ${{item.tipo_intervencao_id}} · Responsável: ${{item.usuario_responsavel || '--'}}</div>
-          <div class="timeline-meta">${{item.descricao || ''}}</div>
+          <div class="badge badge-info">${{escapeHtml(item.status || 'sem status')}}</div>
+          <div class="timeline-title">${{escapeHtml(item.titulo || '--')}}</div>
+          <div class="timeline-meta">Tipo: ${{tipoNome}} · Responsável: ${{escapeHtml(item.usuario_responsavel || '--')}}</div>
+          <div class="timeline-meta">${{escapeHtml(item.descricao || '')}}</div>
           <div class="timeline-meta">Atualizado em ${{fmtDate(item.updated_at || item.created_at)}}</div>
         </div>
-      `).join('') : '<div class="muted">Nenhuma intervenção registrada para este paciente.</div>';
+      `;
+      }}).join('') : '<div class="muted">Nenhuma intervenção registrada para este paciente.</div>';
       return list;
     }}
 
+    draftsEl.addEventListener('input', (event) => {{
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const field = target.getAttribute('data-field');
+      const index = Number(target.getAttribute('data-index'));
+      if (!field || Number.isNaN(index)) return;
+      syncDraftField(index, field, target.value);
+    }});
+
+    draftsEl.addEventListener('change', (event) => {{
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const field = target.getAttribute('data-field');
+      const index = Number(target.getAttribute('data-index'));
+      if (!field || Number.isNaN(index)) return;
+      syncDraftField(index, field, target.value);
+    }});
+
+    draftsEl.addEventListener('click', (event) => {{
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const action = target.getAttribute('data-action');
+      if (action === 'remove-draft') {{
+        const index = Number(target.getAttribute('data-index'));
+        if (!Number.isNaN(index)) removeDraft(index);
+      }}
+    }});
+
+    adicionarAtuacaoBtn.addEventListener('click', () => {{
+      addDraft();
+    }});
+
+    limparAtuacoesBtn.addEventListener('click', () => {{
+      drafts = [createDraft()];
+      renderDrafts();
+    }});
+
     form.addEventListener('submit', async (event) => {{
       event.preventDefault();
-      const payload = {{
-        prontuario: PRONTUARIO,
-        tipo_intervencao_id: Number(tipoIntervencaoIdEl.value),
-        titulo: document.getElementById('titulo').value.trim(),
-        descricao: document.getElementById('descricao').value.trim() || null,
-        status: document.getElementById('status').value,
-        usuario_responsavel: document.getElementById('responsavel').value.trim() || null,
-        data_prevista: document.getElementById('dataPrevista').value || null,
-        observacao: document.getElementById('observacao').value.trim() || null,
-      }};
-      const res = await fetch(`${{API_PREFIX}}/egaa/intervencoes`, {{
-        method: 'POST',
-        headers: {{ 'Content-Type': 'application/json' }},
-        body: JSON.stringify(payload),
-      }});
-      if (!res.ok) {{
-        alert('Não foi possível salvar a atuação.');
+      try {{
+        const items = drafts
+          .filter(item => Object.values(item).some(value => value !== '' && value !== null && value !== undefined))
+          .map(item => {{
+            if (!item.tipo_intervencao_id) {{
+              throw new Error('Selecione o tipo de intervenção em todas as atuações preenchidas.');
+            }}
+            if (!item.titulo.trim()) {{
+              throw new Error('Informe o título de todas as atuações preenchidas.');
+            }}
+            return {{
+              ocupacao_leito_id: null,
+              prontuario: PRONTUARIO,
+              tipo_intervencao_id: Number(item.tipo_intervencao_id),
+              titulo: item.titulo.trim(),
+              descricao: item.descricao.trim() || null,
+              status: item.status,
+              usuario_responsavel: item.usuario_responsavel.trim() || null,
+              data_prevista: item.data_prevista || null,
+              data_conclusao: item.data_conclusao ? `${{item.data_conclusao}}:00` : null,
+              observacao: item.observacao.trim() || null,
+            }};
+          }});
+
+        if (!items.length) {{
+          alert('Adicione pelo menos uma atuação antes de salvar.');
+          return;
+        }}
+
+        const payload = {{ items }};
+        const res = await fetch(`${{API_PREFIX}}/egaa/intervencoes/lote`, {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify(payload),
+        }});
+        if (!res.ok) {{
+          const message = await res.text();
+          alert(`Não foi possível salvar as atuações. ${{message}}`);
+          return;
+        }}
+        drafts = [createDraft()];
+        renderDrafts();
+        await loadHistorico();
+      }} catch (error) {{
+        alert(error.message || 'Verifique os dados preenchidos.');
         return;
       }}
-      form.reset();
-      await loadHistorico();
     }});
 
     document.getElementById('recarregar').addEventListener('click', async () => {{
-      await Promise.all([loadPaciente(), loadHistorico()]);
+      await loadPaciente();
+      await loadTipos();
+      await loadHistorico();
     }});
 
-    Promise.all([loadPaciente(), loadTipos(), loadHistorico()]);
+    drafts = [createDraft()];
+    renderDrafts();
+    (async () => {{
+      await loadPaciente();
+      await loadTipos();
+      await loadHistorico();
+    }})();
   </script>
 </body>
 </html>

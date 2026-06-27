@@ -91,6 +91,10 @@ class EgaaIntervencaoPacienteResponse(EgaaIntervencaoPacienteCreate):
     updated_at: datetime | None = None
 
 
+class EgaaIntervencaoPacienteBatchCreate(BaseModel):
+    items: list[EgaaIntervencaoPacienteCreate] = Field(min_length=1)
+
+
 class EgaaIntervencaoPorTipo(BaseModel):
     tipo_intervencao_id: int
     tipo_intervencao_nome: str
