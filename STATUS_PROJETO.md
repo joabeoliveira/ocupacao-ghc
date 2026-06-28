@@ -1,5 +1,5 @@
 # STATUS DO PROJETO - Ocupação NIR / EGAA
-Data: 2026-06-27
+Data: 2026-06-28
 
 ## Situação atual
 
@@ -11,7 +11,7 @@ O MVP evoluiu para cobrir:
 - catálogo técnico de listas padronizadas;
 - exportações e indicadores básicos.
 
-O projeto está em pausa aguardando uma decisão sobre a melhor estratégia de carga inicial/atualização do banco com a planilha de controle do EGAA.
+O projeto retomou o foco na carga inicial/atualização do banco com a planilha de controle do EGAA.
 
 ## O que já está pronto
 
@@ -26,10 +26,6 @@ O projeto está em pausa aguardando uma decisão sobre a melhor estratégia de c
 ## O que ainda depende de decisão
 
 - Como transformar a planilha atual em carga confiável para o banco.
-- Se a importação será feita:
-  - em um CSV único saneado;
-  - em dois CSVs separados;
-  - ou via carga assistida por etapas.
 - Como tratar campos mistos da planilha, especialmente:
   - evoluções EGAA;
   - pendências para alta;
@@ -38,25 +34,20 @@ O projeto está em pausa aguardando uma decisão sobre a melhor estratégia de c
 
 ## Próximos passos recomendados
 
-1. Definir o formato final da carga.
+1. Executar a carga assistida gerada pela planilha atual.
    - separar ocupação/censo de atuações EGAA;
-   - validar quais colunas entram e quais ficam fora.
+   - gerar arquivos limpos para importação segura.
 
-2. Saneamento da planilha.
-   - transformar campos textuais de EGAA em linhas de atuação;
-   - remover colunas que são apenas referência diária;
-   - padronizar cabeçalhos.
+2. Validar o resultado da carga.
+   - conferir páginas `dashboard`, `pacientes` e `longa-permanencia`;
+   - confirmar se os vínculos 1 paciente -> N atuações ficaram corretos.
 
-3. Aplicar a migration `003_add_data_atuacao_egaa_intervencao.sql`.
-   - só depois da decisão sobre a carga final.
+3. Aplicar a migration `003_add_data_atuacao_egaa_intervencao.sql` se ainda não estiver ativa em produção.
+   - garantir lançamento retroativo correto das atuações.
 
-4. Revalidar produção.
-   - conferir páginas `dashboard`, `pacientes`, `longa-permanencia` e `configuracoes`;
-   - confirmar se a carga escolhida mantém o histórico consistente.
-
-5. Se necessário, criar importador específico para EGAA.
+4. Evoluir a importação assistida, se necessário.
    - carregar atuações como eventos independentes;
-   - manter `1 paciente -> N atuações`.
+   - manter a rastreabilidade dos textos da planilha original.
 
 ## Ponto de atenção
 
@@ -67,12 +58,11 @@ A planilha atual mistura:
 - intervenções;
 - textos livres de acompanhamento.
 
-Por isso, a carga direta sem saneamento tende a gerar inconsistência. O melhor caminho é validar a estrutura final antes de importar.
+Por isso, a carga direta sem saneamento tende a gerar inconsistência. O melhor caminho é usar a carga assistida antes de importar.
 
 ## Próxima ação sugerida
 
-Quando o projeto voltar:
-- revisar o CSV final;
-- fechar o mapeamento de colunas;
-- executar a carga com segurança;
-- aplicar a migration pendente se fizer sentido no cenário escolhido.
+Próximo passo imediato:
+- gerar os arquivos de carga assistida com a planilha atual;
+- revisar a separação entre ocupação e atuações EGAA;
+- importar primeiro a ocupação e depois as atuações.
