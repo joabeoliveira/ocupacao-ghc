@@ -375,8 +375,17 @@ def normalize_censo(df: pd.DataFrame, metadata: dict[str, Any], lote_importacao_
     for column in ["idade_anos", "idade_meses", "dias_internacao"]:
         normalized[column] = pd.array(normalized[column], dtype="Int64")
 
-    # recalcula dias_internacao para garantir consistencia
-    normalized = _recalculate_dias(normalized)
+    # No censo diário, dias_internacao deve refletir exclusivamente a coluna "DIAS INTER.".
+    # Não recalcular por data_internacao/data_snapshot para evitar alterar a fonte oficial do relatório.
+    ocupados_sem_dias = (
+        (normalized["status_leito"] == "Ocupado")
+        & normalized["dias_internacao"].isna()
+    ).sum()
+    if ocupados_sem_dias:
+        LOGGER.warning(
+            "Censo diario com %s leitos ocupados sem DIAS INTER.; mantendo dias_internacao nulo sem recalculo.",
+            int(ocupados_sem_dias),
+        )
 
     for column in ["idade_anos", "idade_meses", "dias_internacao"]:
         normalized[column] = pd.array(normalized[column], dtype="Int64")
