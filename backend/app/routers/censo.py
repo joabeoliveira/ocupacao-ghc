@@ -17,8 +17,27 @@ from app.schemas import CensoKPIsResponse, OcupacaoPorUnidade, PacienteInternado
 router = APIRouter(prefix="/censo", tags=["Censo"])
 
 
+def _resolve_snapshot_bounds(
+    db: Session,
+    data_inicio: date | None,
+    data_fim: date | None,
+) -> tuple[date | None, date | None]:
+    if data_inicio is not None or data_fim is not None:
+        return data_inicio, data_fim
+
+    latest_snapshot = db.scalar(
+        select(func.max(OcupacaoLeitoGHC.data_snapshot)).where(OcupacaoLeitoGHC.fonte_dado == "censo_diario")
+    )
+    if latest_snapshot is None:
+        return None, None
+    return latest_snapshot, latest_snapshot
+
+
 def _active_filter():
-    return and_(OcupacaoLeitoGHC.data_alta.is_(None))
+    return and_(
+        OcupacaoLeitoGHC.fonte_dado == "censo_diario",
+        OcupacaoLeitoGHC.status_leito == "Ocupado",
+    )
 
 
 def _apply_date_filter(query, data_inicio: date | None, data_fim: date | None):
@@ -30,7 +49,7 @@ def _apply_date_filter(query, data_inicio: date | None, data_fim: date | None):
 
 
 def _date_filter_expression(data_inicio: date | None, data_fim: date | None):
-    reference_date = func.coalesce(OcupacaoLeitoGHC.data_snapshot, func.date(OcupacaoLeitoGHC.data_internacao))
+    reference_date = OcupacaoLeitoGHC.data_snapshot
     if data_inicio is not None and data_fim is not None:
         return reference_date.between(data_inicio, data_fim)
     if data_inicio is not None:
@@ -75,6 +94,16 @@ def get_censo_kpis(
     db: Session = Depends(get_db),
 ) -> CensoKPIsResponse:
     try:
+        data_inicio, data_fim = _resolve_snapshot_bounds(db, data_inicio, data_fim)
+        if data_inicio is None and data_fim is None:
+            return CensoKPIsResponse(
+                total_internados=0,
+                longa_permanencia_15=0,
+                longa_permanencia_30=0,
+                longa_permanencia_60_anos=0,
+                ocupacao_por_unidade=[],
+            )
+
         base_query = _filtered_active_query(data_inicio, data_fim)
         base_subquery = base_query.subquery()
 
@@ -131,6 +160,10 @@ def get_pacientes_internados(
     db: Session = Depends(get_db),
 ) -> PacientesInternadosPage:
     try:
+        data_inicio, data_fim = _resolve_snapshot_bounds(db, data_inicio, data_fim)
+        if data_inicio is None and data_fim is None:
+            return PacientesInternadosPage(total=0, page=page, page_size=page_size, items=[])
+
         base_query = _filtered_active_query(data_inicio, data_fim)
         if especialidade:
             base_query = base_query.where(OcupacaoLeitoGHC.especialidade == especialidade)
@@ -149,7 +182,7 @@ def get_pacientes_internados(
             .limit(page_size)
         ).scalars().all()
 
-        egas_map = _egaa_summary_map(db, [row.prontuario for row in rows])
+        egas_map = _egaa_summary_map(db, [row.prontuario for row in rows if row.prontuario])
         items = [
             PacienteInternadoResponse.model_validate(row).model_copy(
                 update=egas_map.get(
@@ -175,9 +208,14 @@ def get_paciente_por_prontuario(
     prontuario: str,
     db: Session = Depends(get_db),
 ) -> PacienteInternadoResponse:
+    data_inicio, data_fim = _resolve_snapshot_bounds(db, None, None)
+    if data_inicio is None and data_fim is None:
+        raise HTTPException(status_code=404, detail="Paciente não encontrado.")
+
     row = db.scalar(
         select(OcupacaoLeitoGHC)
         .where(_active_filter())
+        .where(_date_filter_expression(data_inicio, data_fim))
         .where(OcupacaoLeitoGHC.prontuario == prontuario)
         .order_by(desc(OcupacaoLeitoGHC.dias_internacao), OcupacaoLeitoGHC.nome_paciente)
     )
@@ -199,6 +237,17 @@ def export_pacientes_xlsx(
     idade_minima: int | None = Query(default=None, ge=0),
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
+    data_inicio, data_fim = _resolve_snapshot_bounds(db, data_inicio, data_fim)
+    if data_inicio is None and data_fim is None:
+        empty = BytesIO()
+        pd.DataFrame([]).to_excel(empty, index=False)
+        empty.seek(0)
+        return StreamingResponse(
+            empty,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": 'attachment; filename="egaa_pacientes.xlsx"'},
+        )
+
     base_query = _filtered_active_query(data_inicio, data_fim)
     if especialidade:
         base_query = base_query.where(OcupacaoLeitoGHC.especialidade == especialidade)
@@ -212,7 +261,7 @@ def export_pacientes_xlsx(
     rows = db.execute(
         base_query.order_by(desc(OcupacaoLeitoGHC.dias_internacao), OcupacaoLeitoGHC.nome_paciente)
     ).scalars().all()
-    egas_map = _egaa_summary_map(db, [row.prontuario for row in rows])
+    egas_map = _egaa_summary_map(db, [row.prontuario for row in rows if row.prontuario])
     data = [
         PacienteInternadoResponse.model_validate(row)
         .model_copy(update=egas_map.get(row.prontuario, {"egaa_total_atuacoes": 0, "egaa_ultima_atuacao": None}))
