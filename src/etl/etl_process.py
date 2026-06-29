@@ -409,7 +409,7 @@ def get_ocupacao_table_definition(metadata: MetaData) -> Table:
     return Table(
         TABLE_NAME,
         metadata,
-        Column("prontuario", String(50), nullable=False),
+        Column("prontuario", String(50), nullable=True),
         Column("nome_paciente", String(255)),
         Column("idade_anos", Integer),
         Column("idade_meses", Integer),

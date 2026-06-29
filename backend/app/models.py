@@ -13,7 +13,7 @@ class OcupacaoLeitoGHC(Base):
     __tablename__ = "ocupacao_leitos_ghc"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    prontuario: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    prontuario: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     nome_paciente: Mapped[str | None] = mapped_column(String(255), nullable=True)
     idade_anos: Mapped[int | None] = mapped_column(Integer, nullable=True)
     idade_meses: Mapped[int | None] = mapped_column(Integer, nullable=True)
