@@ -100,6 +100,7 @@ def get_censo_kpis(
                 total_internados=0,
                 longa_permanencia_15=0,
                 longa_permanencia_30=0,
+                longa_permanencia_40=0,
                 longa_permanencia_60_anos=0,
                 ocupacao_por_unidade=[],
             )
@@ -113,6 +114,9 @@ def get_censo_kpis(
         ) or 0
         longa_30 = db.scalar(
             select(func.count()).select_from(base_subquery).where(base_subquery.c.dias_internacao >= 30)
+        ) or 0
+        longa_40 = db.scalar(
+            select(func.count()).select_from(base_subquery).where(base_subquery.c.dias_internacao >= 40)
         ) or 0
         longa_60_anos = db.scalar(
             select(func.count()).select_from(base_subquery).where(base_subquery.c.idade_anos >= 60)
@@ -132,6 +136,7 @@ def get_censo_kpis(
             total_internados=0,
             longa_permanencia_15=0,
             longa_permanencia_30=0,
+            longa_permanencia_40=0,
             longa_permanencia_60_anos=0,
             ocupacao_por_unidade=[],
         )
@@ -140,6 +145,7 @@ def get_censo_kpis(
         total_internados=total_internados,
         longa_permanencia_15=longa_15,
         longa_permanencia_30=longa_30,
+        longa_permanencia_40=longa_40,
         longa_permanencia_60_anos=longa_60_anos,
         ocupacao_por_unidade=[
             OcupacaoPorUnidade(unidade=row.unidade, total_pacientes=row.total_pacientes) for row in unidades

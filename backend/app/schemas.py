@@ -14,6 +14,7 @@ class CensoKPIsResponse(BaseModel):
     total_internados: int
     longa_permanencia_15: int
     longa_permanencia_30: int
+    longa_permanencia_40: int
     longa_permanencia_60_anos: int
     ocupacao_por_unidade: list[OcupacaoPorUnidade]
 
