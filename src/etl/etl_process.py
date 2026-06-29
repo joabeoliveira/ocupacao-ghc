@@ -87,6 +87,20 @@ def parse_dias_internacao(value: Any) -> int | None:
         return int(days.group(1))
     return clean_int(text)
 
+def normalizar_status_leito(valor: Any) -> str | None:
+    if valor is None or (isinstance(valor, float) and pd.isna(valor)):
+        return None
+    texto = str(valor).strip()
+    if not texto:
+        return None
+    low = texto.lower()
+    if low.startswith("ocupado"):
+        return "Ocupado"
+    if low.startswith("livre"):
+        return "Livre"
+    if low.startswith("bloqueado"):
+        return "Bloqueado"
+    return texto
 
 def build_hash_registro(values: Iterable[Any]) -> str:
     base = "|".join("" if value is None else str(value).strip() for value in values)
@@ -311,8 +325,9 @@ def _recalculate_dias(df: pd.DataFrame) -> pd.DataFrame:
 def normalize_censo(df: pd.DataFrame, metadata: dict[str, Any], lote_importacao_id: str) -> pd.DataFrame:
     alias_map = _build_column_alias_map(df)
     normalized = pd.DataFrame()
-    normalized["prontuario"] = _get_series_by_alias(df, alias_map, ["PRONT", "PRONTUARIO"], required=True).apply(clean_string)
-    normalized["nome_paciente"] = _get_series_by_alias(df, alias_map, ["NOME"], required=True).apply(clean_string)
+    # Para censo diário, prontuario/nome podem estar ausentes (leitos livres/bloqueados)
+    normalized["prontuario"] = _get_series_by_alias(df, alias_map, ["PRONT", "PRONTUARIO"], required=False).apply(clean_string)
+    normalized["nome_paciente"] = _get_series_by_alias(df, alias_map, ["NOME"], required=False).apply(clean_string)
     normalized["idade_anos"] = _get_series_by_alias(df, alias_map, ["IDADE (a)", "IDADE_ANOS"]).apply(clean_int)
     normalized["idade_meses"] = _get_series_by_alias(df, alias_map, ["IDADE (m)", "IDADE_MES"]).apply(clean_int)
     normalized["data_internacao"] = _get_series_by_alias(df, alias_map, ["DATA INTERNACAO", "DATA_INTERNACAO"], required=True).apply(parse_datetime_br)
@@ -326,6 +341,7 @@ def normalize_censo(df: pd.DataFrame, metadata: dict[str, Any], lote_importacao_
     normalized["unidade"] = _get_series_by_alias(df, alias_map, ["UNIDADE"]).apply(clean_string)
     normalized["enfermaria"] = _get_series_by_alias(df, alias_map, ["ENFERMARIA"]).apply(clean_string)
     normalized["leito"] = _get_series_by_alias(df, alias_map, ["LEITO"]).apply(clean_string)
+    normalized["status_leito"] = _get_series_by_alias(df, alias_map, ["STATUS LEITO", "STATUS_LEITO"]).apply(clean_string).apply(normalizar_status_leito)
     normalized["cid_internacao_codigo"] = _get_series_by_alias(df, alias_map, ["CID", "CID_INTERNACAO"]).apply(clean_string)
     normalized["cid_internacao_descricao"] = _get_series_by_alias(df, alias_map, ["CID DESCRICAO", "CID_DESCRICAO"]).apply(clean_string)
     normalized["tipo_alta"] = None
@@ -342,14 +358,17 @@ def normalize_censo(df: pd.DataFrame, metadata: dict[str, Any], lote_importacao_
     normalized["periodo_referencia_fim"] = None
     normalized["data_impressao_arquivo"] = data_impressao
     normalized["hash_registro"] = normalized.apply(
+    normalized["hash_registro"] = normalized.apply(
         lambda row: build_hash_registro(
             [
-                row["prontuario"],
-                row["data_internacao"],
-                row["data_snapshot"],
-                row["leito"],
-                row["cid_internacao_codigo"],
-                row["fonte_dado"],
+                row.get("data_snapshot"),
+                row.get("unidade"),
+                row.get("enfermaria"),
+                row.get("leito"),
+                row.get("status_leito"),
+                row.get("prontuario"),
+                row.get("data_internacao"),
+                row.get("fonte_dado"),
             ]
         ),
         axis=1,
@@ -402,6 +421,7 @@ def get_ocupacao_table_definition(metadata: MetaData) -> Table:
         Column("unidade", String(150)),
         Column("enfermaria", String(150)),
         Column("leito", String(50)),
+        Column("status_leito", String(100)),
         Column("cid_internacao_codigo", String(20)),
         Column("cid_internacao_descricao", String(255)),
         Column("tipo_alta", String(100)),
@@ -449,14 +469,16 @@ def persist_dataframe(df: pd.DataFrame, engine) -> int:
     work["hash_registro"] = work["hash_registro"].apply(clean_string)
 
     work["especialidade"] = work["especialidade"].fillna("NAO INFORMADA")
-
-    required_mask = (
-        work["prontuario"].notna()
-        & work["especialidade"].notna()
+    # Para censo_diario, prontuario pode ser nulo (leitos livres/bloqueados).
+    base_required = (
+        work["especialidade"].notna()
         & work["fonte_dado"].notna()
         & work["lote_importacao_id"].notna()
         & work["nome_arquivo"].notna()
         & work["hash_registro"].notna()
+    )
+    required_mask = base_required & (
+        (work["fonte_dado"] != "historico_internacao") | work["prontuario"].notna()
     )
     work = work.loc[required_mask].copy()
     dropped = initial_len - len(work)
@@ -488,6 +510,7 @@ def persist_dataframe(df: pd.DataFrame, engine) -> int:
                 unidade=statement.inserted.unidade,
                 enfermaria=statement.inserted.enfermaria,
                 leito=statement.inserted.leito,
+                status_leito=statement.inserted.status_leito,
                 cid_internacao_codigo=statement.inserted.cid_internacao_codigo,
                 cid_internacao_descricao=statement.inserted.cid_internacao_descricao,
                 tipo_alta=statement.inserted.tipo_alta,

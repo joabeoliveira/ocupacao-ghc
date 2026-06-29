@@ -25,6 +25,7 @@ class OcupacaoLeitoGHC(Base):
     unidade: Mapped[str | None] = mapped_column(String(150), nullable=True, index=True)
     enfermaria: Mapped[str | None] = mapped_column(String(150), nullable=True)
     leito: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    status_leito: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     cid_internacao_codigo: Mapped[str | None] = mapped_column(String(20), nullable=True)
     cid_internacao_descricao: Mapped[str | None] = mapped_column(Text, nullable=True)
     tipo_alta: Mapped[str | None] = mapped_column(String(100), nullable=True)
