@@ -358,7 +358,6 @@ def normalize_censo(df: pd.DataFrame, metadata: dict[str, Any], lote_importacao_
     normalized["periodo_referencia_fim"] = None
     normalized["data_impressao_arquivo"] = data_impressao
     normalized["hash_registro"] = normalized.apply(
-    normalized["hash_registro"] = normalized.apply(
         lambda row: build_hash_registro(
             [
                 row.get("data_snapshot"),
