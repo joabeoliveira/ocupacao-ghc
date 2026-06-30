@@ -170,3 +170,62 @@ O formulário do paciente deve permitir:
 - linha do tempo: mostrar o rótulo do tipo, o status e a data da última atualização;
 - relatórios: usar os códigos canônicos para agrupar indicadores;
 - planilha/seed: manter esta lista como base de referência para novas migrações.
+
+
+## Lista de intervenções EGAA constante na planilha
+
+- LAUDOS
+- ENCAIXE DE EXAME
+- ARTICULAÇÃO COM EQUIPE DE ESPECIALISTAS
+- ENTREVISTA CLÍNICA
+- ORIENTAÇÃO QUANTO AOS RECURSOS TERAPÊUTICOS DISPONÍVEIS
+- PROCEDIMENTOS
+- SOLICITADO ACOMPANHAMENTO DA T.O.
+- SOLICITADO MOVIMENTAÇÃO DE LEITO - NIR
+- ORIENTAÇÃO QUANTO A REGULAÇÃO
+- SOLICITADO AGILIDADE NA RESPOSTA DO PARECER
+- SOLICITADO ACOMPANHAMENTO DA ODONTOLOGIA
+- DISCUTIDO PENDENCIAS E CONDUTAS EM ROUND
+- REUNIÃO COM EQUIPE ASSISTENCIAL
+- SOLICITADO ACOMPANHAMENTO DA FISIOTERAPIA
+- ORIENTAÇÃO EDUCATIVA
+- SOLICITADO ACOMPANHAMENTO DO SERVIÇO SOCIAL
+- MELHOR EM CASA
+- CONFERENCIA FAMILIAR
+- SOLICITAÇÃO DE TRANSPORTE
+- ENTREVISTA SOCIAL
+- SOLICITADO ACOMPANHAMENTO DA PSICOLOGIA
+- ORIENTAÇÃO QUANTO AOS RECURSOS SOCIAIS
+- CONTATO COM CUIDADOR/FAMILIAR
+- SERVIÇO SOCIAL
+- REGULADO PARA ABRIGO
+- ORGANIZAÇÃO DE PROGRAMAÇÃO PARA INTERNAÇÃO E REGULAÇÃO DE LEITO
+- ARTICULAÇÃO COM A REDE
+- ENTREVISTA DE ENFERMAGEM
+- ACOMPANHAMENTO DO QUADRO CLÍNICO DE PACIENTE
+- SOLICITADO BREVIDADE EM EXAMES LABORATORIAIS
+- ACOMPANHAR EXAMES/CONSULTAS/PROCEDIMENTOS REGULADOS VIA NIR
+- ACOMPANHAMENTO DE REGULAÇÃO DE HD
+- ACOMPANHAR SOLICITAÇÃO DE TRANSFERÊNCIA PARA HOSPITAL ONCOLÓGICO
+- PLANEJAMENTO DA ALTA HOSPITALAR
+
+## Lista otimizada para o formulário do paciente
+
+- Acompanhado pela Fisioterapia
+- Acompanhado pela Odontologia
+- Acompanhado pela Psicologia
+- Acompanhado pela Terapia Ocupacional
+- Acompanhado pelo Serviço Social
+- Articulado com a rede
+- Avaliado quadro clínico
+- Organizada vaga (NIR)
+- Planejada alta hospitalar
+- Realizada conferência familiar
+- Realizada entrevista clínica
+- Realizada entrevista social
+- Realizada reunião com equipe
+- Registradas orientações
+- Registrado laudo técnico
+- Solicitados exames/consultas
+- Solicitado transporte
+
