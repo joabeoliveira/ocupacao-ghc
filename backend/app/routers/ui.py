@@ -2169,7 +2169,7 @@ def configuracoes_route() -> str:
     function fmtDate(value) {
       if (!value) return '--';
       try {
-        const normalized = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+        const normalized = typeof value === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(value)
           ? `${value}T00:00:00`
           : value;
         return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(normalized));

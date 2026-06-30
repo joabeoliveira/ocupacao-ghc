@@ -2,6 +2,51 @@
 
 Este documento é a fonte de verdade para qualquer agente (humanos ou LLMs) que precise compreender, desenvolver ou operar o MVP de ocupação hospitalar (EGAA). Contém visão de negócio, arquitetura, pontos de integração, convenções e passos práticos para reprodução local, deploy e troubleshooting.
 
+## Atualização 2026-06-30 (estado atual validado)
+
+Resumo do que está efetivamente em produção provisória e no código:
+
+- Importação de censo diário corrigida para preservar o snapshot completo de leitos (`Ocupado`, `Livre`, `Bloqueado`).
+- `status_leito` persistido na tabela principal (`ocupacao_leitos_ghc`).
+- Censo diário aceita `prontuario` nulo para leitos livres/bloqueados (migration dedicada).
+- `dias_internacao` do censo diário vem exclusivamente da coluna `DIAS INTER.` (sem recálculo por datas).
+- API de censo opera por snapshot de `censo_diario` (quando sem data, usa `MAX(data_snapshot)`).
+- KPIs de paciente consideram apenas `status_leito = 'Ocupado'`.
+- Dashboard e Longa Permanência com KPIs atualizados e filtros por nome/prontuário.
+
+Migrations relevantes desta frente:
+
+- `migrations/004_add_status_leito.sql`
+- `migrations/005_allow_null_prontuario_for_censo.sql`
+
+Validação referência (snapshot `2026-06-29`):
+
+- total: `642`
+- ocupados: `412`
+- livres: `165`
+- bloqueados: `65`
+
+Longa permanência validada para ocupados:
+
+- `>=15`: `152`
+- `>=30`: `84`
+- `>=40`: `53`
+
+KPIs ativos do Dashboard (versão atual):
+
+- leitos ocupados;
+- leitos livres;
+- leitos bloqueados;
+- taxa de ocupação geral;
+- taxa de ocupação operacional;
+- longa permanência (`>=15`, `>=30`);
+- pacientes `>=60`, `>=60 com >=15`, `>=60 com >=30`.
+
+Observação sobre taxa ajustada sem emergência:
+
+- A lógica existe na API e exclui leitos de emergência por prefixo do campo `leito`, cobrindo variações como `111.01`, `113.05`, `114.01`.
+- Leitos-base considerados emergência: `111`, `113`, `114`, `115`, `116`, `117`.
+
 ## 1. Visão e Objetivo
 
 Objetivo: fornecer ingestão automatizada e padronizada de relatórios do `esusreport` (histórico e censo diário), persistir em tabela única analítica e expor KPIs e listagens via API para suporte à regulação e gestão de leitos.
