@@ -329,6 +329,249 @@ def dashboard_page() -> str:
     <main class="main">
       <div class="shell">
         <div class="header">
+          <div>
+            <h1>Dashboard</h1>
+            <p class="subtitle">Visão rápida dos internados, da concentração por unidade e da lista filtrável de pacientes.</p>
+          </div>
+          <div class="header-actions">
+            <a class="pill-link" href="/upload">Ir para Upload</a>
+            <a class="pill-link" href="/api/censo/export/xlsx">Exportar Pacientes</a>
+            <a class="pill-link" href="/configuracoes">Configurações EGAA</a>
+          </div>
+        </div>
+
+        <section id="resumo" class="filters">
+          <div class="filters-grid">
+            <div class="field">
+              <label for="prontuario">Prontuário</label>
+              <input id="prontuario" placeholder="ex: 123456" />
+            </div>
+            <div class="field">
+              <label for="nome">Nome</label>
+              <input id="nome" placeholder="ex: MARIA" />
+            </div>
+            <div class="field">
+              <label for="especialidade">Especialidade</label>
+              <input id="especialidade" placeholder="ex: DERMATO" />
+            </div>
+            <div class="field">
+              <label for="unidade">Unidade</label>
+              <input id="unidade" placeholder="ex: HFB" />
+            </div>
+            <div class="field">
+              <label for="dataInicio">Data inicial</label>
+              <input id="dataInicio" type="date" />
+            </div>
+            <div class="field">
+              <label for="dataFim">Data final</label>
+              <input id="dataFim" type="date" />
+            </div>
+            <div class="field">
+              <label for="pageSizeSelect">Itens por página</label>
+              <select id="pageSizeSelect">
+                <option value="5">5</option>
+                <option value="10" selected>10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+              </select>
+            </div>
+          </div>
+          <div class="actions" style="margin-top: 12px;">
+            <button id="filtrar">Aplicar filtros</button>
+            <button id="refresh" class="secondary-btn">Recarregar</button>
+          </div>
+        </section>
+
+        <div class="cards" id="kpis">
+          <div class="card">Carregando...</div>
+        </div>
+
+        <section class="section" style="margin-top:16px;">
+          <div class="section-header">
+            <div>
+              <h2>Longa permanência em foco</h2>
+              <p id="longaResumo" class="muted">Aguardando dados...</p>
+            </div>
+            <a class="pill-link" href="/longa-permanencia">Abrir página dedicada</a>
+          </div>
+          <div class="section-body">
+            <div class="chart-list" id="longaChart">
+              <div class="muted">Aguardando dados...</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-header">
+            <div>
+              <h2>Resultados do EGAA</h2>
+              <p id="egaaResumo" class="muted">Aguardando indicadores de atuação.</p>
+            </div>
+          </div>
+          <div class="section-body">
+            <div class="cards" id="egaaKpis">
+              <div class="card">Aguardando dados...</div>
+            </div>
+            <div class="grid" style="margin-top:16px;">
+              <div class="card">
+                <strong>Intervenções por status</strong>
+                <div class="chart-list" id="egaaStatusChart">
+                  <div class="muted">Aguardando dados...</div>
+                </div>
+              </div>
+              <div class="card">
+                <strong>Intervenções por tipo</strong>
+                <div class="chart-list" id="egaaTipoChart">
+                  <div class="muted">Aguardando dados...</div>
+                </div>
+              </div>
+            </div>
+            <div class="card" style="margin-top:16px;">
+              <strong>Evolução mensal</strong>
+              <div class="chart-list" id="egaaMesChart">
+                <div class="muted">Aguardando dados...</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="unidadesSection">
+          <div class="section-header">
+            <div>
+              <h2>Unidades com mais pacientes</h2>
+              <p id="unidadesResumo" class="muted">Aguardando dados...</p>
+            </div>
+          </div>
+          <div class="section-body">
+            <div class="chart-list" id="unidadesChart">
+              <div class="muted">Aguardando dados...</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="patient-section" id="pacientes">
+          <div class="section-title">
+            <div>
+              <h2>Pacientes internados</h2>
+              <p>Lista filtrável ordenada por tempo de internação.</p>
+            </div>
+            <p class="muted" id="pageInfo">Página 1</p>
+          </div>
+
+          <div class="section">
+            <div class="section-body">
+              <table aria-live="polite">
+                <thead>
+                  <tr><th>Prontuario</th><th>Nome</th><th>Idade</th><th>Dias</th><th>Especialidade</th><th>Unidade</th></tr>
+                </thead>
+                <tbody id="rows">
+                </tbody>
+              </table>
+              <div style="margin-top:12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <button id="prev">Anterior</button>
+                <button id="next">Próxima</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const API_PREFIX = '/api';
+    const kpisEl = document.getElementById('kpis');
+    const longaChartEl = document.getElementById('longaChart');
+    const longaResumoEl = document.getElementById('longaResumo');
+    const egaaResumoEl = document.getElementById('egaaResumo');
+    const egaaKpisEl = document.getElementById('egaaKpis');
+    const egaaStatusChartEl = document.getElementById('egaaStatusChart');
+    const egaaTipoChartEl = document.getElementById('egaaTipoChart');
+    const egaaMesChartEl = document.getElementById('egaaMesChart');
+    const unidadesChartEl = document.getElementById('unidadesChart');
+    const unidadesResumoEl = document.getElementById('unidadesResumo');
+    const rowsEl = document.getElementById('rows');
+    const prontuarioEl = document.getElementById('prontuario');
+    const nomeEl = document.getElementById('nome');
+    const especialidadeEl = document.getElementById('especialidade');
+    const unidadeEl = document.getElementById('unidade');
+    const dataInicioEl = document.getElementById('dataInicio');
+    const dataFimEl = document.getElementById('dataFim');
+    const filtrarBtn = document.getElementById('filtrar');
+    const prevBtn = document.getElementById('prev');
+    const nextBtn = document.getElementById('next');
+    const pageInfo = document.getElementById('pageInfo');
+
+    let page = 1; let pageSize = parseInt(document.getElementById('pageSizeSelect').value, 10) || 10;
+
+    async function loadKPIs() {
+      const params = new URLSearchParams();
+      if (dataInicioEl.value) params.set('data_inicio', dataInicioEl.value);
+      if (dataFimEl.value) params.set('data_fim', dataFimEl.value);
+
+      const query = params.toString();
+      const res = await fetch(`${API_PREFIX}/censo/kpis${query ? `?${query}` : ''}`);
+      if (!res.ok) return kpisEl.innerHTML = '<div class="card">Erro ao obter KPIs</div>';
+      const data = await res.json();
+      const fmtPct = (value) => `${Number(value || 0).toFixed(2)}%`;
+      const unidades = Array.isArray(data.ocupacao_por_unidade) ? data.ocupacao_por_unidade : [];
+      const topUnidades = unidades.slice(0, 5);
+      const resto = Math.max(unidades.length - topUnidades.length, 0);
+      kpisEl.innerHTML = `
+        <div class="card"><span class="badge badge-info">Leitos</span><strong>Leitos ocupados</strong><div class="kpi-value">${data.leitos_ocupados}</div></div>
+        <div class="card"><span class="badge badge-secondary">Leitos</span><strong>Leitos livres</strong><div class="kpi-value">${data.leitos_livres}</div></div>
+        <div class="card"><span class="badge badge-warning">Leitos</span><strong>Leitos bloqueados</strong><div class="kpi-value">${data.leitos_bloqueados}</div></div>
+        <div class="card"><span class="badge badge-success">Taxa</span><strong>Ocupação geral</strong><div class="kpi-value">${fmtPct(data.taxa_ocupacao_geral_percentual)}</div></div>
+        <div class="card"><span class="badge badge-success">Taxa</span><strong>Ocupação operacional</strong><div class="kpi-value">${fmtPct(data.taxa_ocupacao_operacional_percentual)}</div></div>
+        <div class="card"><span class="badge badge-warning">Atenção</span><strong>>=15 dias</strong><div class="kpi-value">${data.longa_permanencia_15}</div></div>
+        <div class="card"><span class="badge badge-error">Crítico</span><strong>>=30 dias</strong><div class="kpi-value">${data.longa_permanencia_30}</div></div>
+        <div class="card"><span class="badge badge-secondary">60+ anos</span><strong>Pacientes</strong><div class="kpi-value">${data.longa_permanencia_60_anos}</div></div>
+        <div class="card"><span class="badge badge-secondary">60+ e 15+</span><strong>Pacientes</strong><div class="kpi-value">${data.longa_permanencia_60_15}</div></div>
+        <div class="card"><span class="badge badge-secondary">60+ e 30+</span><strong>Pacientes</strong><div class="kpi-value">${data.longa_permanencia_60_30}</div></div>`;
+      unidadesResumoEl.textContent = unidades.length
+        ? `Mostrando as ${topUnidades.length} unidades com mais pacientes de um total de ${unidades.length}.`
+        : 'Nenhuma unidade retornada pela API.';
+      const longaParams = new URLSearchParams();
+      longaParams.set('min_dias', '15');
+      longaParams.set('page_size', '5');
+      if (dataInicioEl.value) longaParams.set('data_inicio', dataInicioEl.value);
+      if (dataFimEl.value) longaParams.set('data_fim', dataFimEl.value);
+      const longaRes = await fetch(`${API_PREFIX}/censo/pacientes?` + longaParams.toString());
+      if (longaRes.ok) {
+        const longaData = await longaRes.json();
+        const longaItems = Array.isArray(longaData.items) ? longaData.items : [];
+        longaResumoEl.textContent = longaItems.length
+          ? `Top ${longaItems.length} pacientes com 15+ dias de internação.`
+          : 'Nenhum paciente em longa permanência para exibir.';
+        longaChartEl.innerHTML = longaItems.length
+          ? longaItems.map(item => {
+              const dias = Number(item.dias_internacao || 0);
+              const width = Math.max(6, Math.min(100, dias * 3));
+              return `
+                <div class="chart-row">
+                  <div class="chart-name" title="${item.nome_paciente || '--'}">${item.nome_paciente || '--'}</div>
+                  <div class="chart-track" aria-hidden="true"><div class="chart-fill" style="width:${width}%"></div></div>
+                  <div class="chart-value">${dias}d</div>
+                </div>`;
+            }).join('')
+          : '<div class="muted">Nenhum paciente para exibir.</div>';
+      } else {
+        longaResumoEl.textContent = 'Falha ao carregar longa permanência.';
+        longaChartEl.innerHTML = '<div class="muted">Não foi possível carregar a longa permanência.</div>';
+      }
+      const maxValue = topUnidades.reduce((acc, item) => Math.max(acc, item.total_pacientes || 0), 0) || 1;
+      unidadesChartEl.innerHTML = topUnidades.length
+        ? topUnidades.map(u => {
+            const width = Math.max(6, Math.round(((u.total_pacientes || 0) / maxValue) * 100));
+            return `
+              <div class="chart-row">
+                <div class="chart-name" title="${u.unidade || '--'}">${u.unidade || '--'}</div>
+                <div class="chart-track" aria-hidden="true"><div class="chart-fill" style="width:${width}%"></div></div>
+                <div class="chart-value">${u.total_pacientes}</div>
+              </div>`;
+          }).join('')
+        : '<div class="muted">Nenhuma unidade para exibir.</div>';
+    }
 
     async function loadEgaaIndicadores() {
       const res = await fetch(`${API_PREFIX}/egaa/indicadores`);
