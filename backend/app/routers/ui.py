@@ -513,11 +513,9 @@ def dashboard_page() -> str:
         <div class="card"><span class="badge badge-info">Ao vivo</span><strong>Internados</strong><div class="kpi-value">${data.total_internados}</div></div>
         <div class="card"><span class="badge badge-warning">Atenção</span><strong>>=15 dias</strong><div class="kpi-value">${data.longa_permanencia_15}</div></div>
         <div class="card"><span class="badge badge-error">Crítico</span><strong>>=30 dias</strong><div class="kpi-value">${data.longa_permanencia_30}</div></div>
-        <div class="card"><span class="badge badge-error">Crítico+</span><strong>>=40 dias</strong><div class="kpi-value">${data.longa_permanencia_40}</div></div>
         <div class="card"><span class="badge badge-secondary">60+ anos</span><strong>Pacientes</strong><div class="kpi-value">${data.longa_permanencia_60_anos}</div></div>
         <div class="card"><span class="badge badge-secondary">60+ e 15+</span><strong>Pacientes</strong><div class="kpi-value">${data.longa_permanencia_60_15}</div></div>
-        <div class="card"><span class="badge badge-secondary">60+ e 30+</span><strong>Pacientes</strong><div class="kpi-value">${data.longa_permanencia_60_30}</div></div>
-        <div class="card"><span class="badge badge-success">Ativo</span><strong>Unidades ativas</strong><div class="kpi-value">${unidades.length}</div><div class="muted" style="margin-top:6px">Top ${topUnidades.length}${resto ? ` + ${resto} outras` : ''}</div></div>`;
+        <div class="card"><span class="badge badge-secondary">60+ e 30+</span><strong>Pacientes</strong><div class="kpi-value">${data.longa_permanencia_60_30}</div></div>`;
       unidadesResumoEl.textContent = unidades.length
         ? `Mostrando as ${topUnidades.length} unidades com mais pacientes de um total de ${unidades.length}.`
         : 'Nenhuma unidade retornada pela API.';
