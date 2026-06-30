@@ -83,3 +83,26 @@ A correção do censo diário foi implementada e validada no ambiente provisóri
 
 - Permanece um `SyntaxWarning` antigo em `backend/app/routers/ui.py` relacionado a escape de regex JavaScript embutida em string Python.
 - Não bloqueia execução, mas recomenda-se ajuste posterior de higiene de código.
+
+## Atualizações recentes (30/06)
+
+- Corrigido o `SyntaxWarning` em `backend/app/routers/ui.py` (escape de regex JavaScript). Commit aplicado no repositório.
+- Adicionada uma barra de navegação simples na página de Upload para facilitar retorno às telas principais (`/dashboard`, `/pacientes`, `/configuracoes`).
+- Criado o script de seed `scripts/seed_egaa_tipos.py` para popular a tabela `egaa_tipo_intervencao` com a lista padronizada de intervenções.
+- Fornecido bloco SQL com `INSERT ... ON DUPLICATE KEY UPDATE` para uso direto no phpMyAdmin (opção recomendada quando o acesso ao MySQL pelo ambiente local não estiver disponível).
+- Observação de execução: tentativa de rodar o seed localmente falhou devido a conexão MySQL não acessível no ambiente do agente (ConnectionRefused). Instruções para executar localmente:
+   - No PowerShell:
+
+      ```powershell
+      $env:PYTHONPATH='backend'
+      python scripts/seed_egaa_tipos.py
+      ```
+
+   - Ou cole o SQL na aba SQL do phpMyAdmin.
+
+## Próximos passos específicos sugeridos
+
+- Executar o SQL no phpMyAdmin para popular `egaa_tipo_intervencao` (rápido e direto).
+- Rodar o seed localmente após garantir acesso ao banco (`$env:PYTHONPATH='backend' python scripts/seed_egaa_tipos.py`).
+- Validar dropdown `Tipo de intervenção` na página do paciente e confirmar que todas as opções aparecem.
+
