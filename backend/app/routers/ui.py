@@ -511,13 +511,11 @@ def dashboard_page() -> str:
       const topUnidades = unidades.slice(0, 5);
       const resto = Math.max(unidades.length - topUnidades.length, 0);
       kpisEl.innerHTML = `
-        <div class="card"><span class="badge badge-info">Ao vivo</span><strong>Internados</strong><div class="kpi-value">${data.total_internados}</div></div>
         <div class="card"><span class="badge badge-info">Leitos</span><strong>Leitos ocupados</strong><div class="kpi-value">${data.leitos_ocupados}</div></div>
         <div class="card"><span class="badge badge-secondary">Leitos</span><strong>Leitos livres</strong><div class="kpi-value">${data.leitos_livres}</div></div>
         <div class="card"><span class="badge badge-warning">Leitos</span><strong>Leitos bloqueados</strong><div class="kpi-value">${data.leitos_bloqueados}</div></div>
         <div class="card"><span class="badge badge-success">Taxa</span><strong>Ocupação geral</strong><div class="kpi-value">${fmtPct(data.taxa_ocupacao_geral_percentual)}</div></div>
         <div class="card"><span class="badge badge-success">Taxa</span><strong>Ocupação operacional</strong><div class="kpi-value">${fmtPct(data.taxa_ocupacao_operacional_percentual)}</div></div>
-        <div class="card"><span class="badge badge-success">Taxa</span><strong>Ocupação ajustada (sem emergência)</strong><div class="kpi-value">${fmtPct(data.taxa_ocupacao_ajustada_sem_emergencia_percentual)}</div></div>
         <div class="card"><span class="badge badge-warning">Atenção</span><strong>>=15 dias</strong><div class="kpi-value">${data.longa_permanencia_15}</div></div>
         <div class="card"><span class="badge badge-error">Crítico</span><strong>>=30 dias</strong><div class="kpi-value">${data.longa_permanencia_30}</div></div>
         <div class="card"><span class="badge badge-secondary">60+ anos</span><strong>Pacientes</strong><div class="kpi-value">${data.longa_permanencia_60_anos}</div></div>
