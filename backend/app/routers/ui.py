@@ -1089,16 +1089,32 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
         const atual = item.egaa_ultima_atuacao || '';
         return atual && (!acc || String(atual) > String(acc)) ? atual : acc;
       }}, '');
-      kpisEl.innerHTML = `
-        <div class="card"><span class="badge {badge_class}">{badge_text}</span><strong>Total encontrado</strong><div class="kpi-value">${{data.total}}</div></div>
-        <div class="card"><span class="badge badge-info">Página atual</span><strong>Paginação</strong><div class="kpi-value">${{data.page}}</div></div>
-        <div class="card"><span class="badge badge-secondary">Lote visual</span><strong>Itens por página</strong><div class="kpi-value">${{data.page_size}}</div></div>
-        ${{isLongaPermanencia ? `<div class="card"><span class="badge badge-warning">Longa permanência</span><strong>Dias mínimos</strong><div class="kpi-value">${{diasMinimos}}</div></div>` : ''}}
-        ${{isLongaPermanencia ? `<div class="card"><span class="badge badge-warning">Acompanhamento</span><strong>Média na página</strong><div class="kpi-value">${{mediaDias}}d</div></div>` : ''}}
-        ${{isLongaPermanencia ? `<div class="card"><span class="badge badge-warning">Maior permanência</span><strong>Maior valor</strong><div class="kpi-value">${{diasMaximos}}d</div><div class="muted" style="margin-top:6px">${{unidadeLiderNome}} (${{unidadeLiderTotal}} registros)</div></div>` : ''}}
-        ${{isLongaPermanencia ? `<div class="card"><span class="badge badge-secondary">EGAA</span><strong>Pacientes com atuações</strong><div class="kpi-value">${{egaaAtivos}}</div><div class="muted" style="margin-top:6px">${{egaaAtuacoesTotal}} atuações no recorte</div></div>` : ''}}
-        ${{isLongaPermanencia ? `<div class="card"><span class="badge badge-secondary">EGAA</span><strong>Última atuação</strong><div class="kpi-value" style="font-size:18px; line-height:1.3">${{egaaUltimaAtuacao ? new Intl.DateTimeFormat('pt-BR').format(new Date(egaaUltimaAtuacao)) : '--'}}</div></div>` : ''}}
-      `;
+      if (isLongaPermanencia) {{
+        const kpiParams = new URLSearchParams();
+        if (dataInicioEl.value) kpiParams.set('data_inicio', dataInicioEl.value);
+        if (dataFimEl.value) kpiParams.set('data_fim', dataFimEl.value);
+
+        const kpiRes = await fetch(`${{API_PREFIX}}/censo/kpis${{kpiParams.toString() ? `?${{kpiParams.toString()}}` : ''}}`);
+        if (kpiRes.ok) {{
+          const k = await kpiRes.json();
+          kpisEl.innerHTML = `
+            <div class="card"><span class="badge badge-info">Internação</span><strong>Total de pacientes internados</strong><div class="kpi-value">${{k.total_internados}}</div></div>
+            <div class="card"><span class="badge badge-warning">Longa</span><strong>Pacientes com permanência >= 15 dias</strong><div class="kpi-value">${{k.longa_permanencia_15}}</div></div>
+            <div class="card"><span class="badge badge-error">Longa</span><strong>Pacientes com permanência >= 30 dias</strong><div class="kpi-value">${{k.longa_permanencia_30}}</div></div>
+            <div class="card"><span class="badge badge-secondary">Idade</span><strong>Pacientes >= 60 anos</strong><div class="kpi-value">${{k.longa_permanencia_60_anos}}</div></div>
+            <div class="card"><span class="badge badge-secondary">Idade + Longa</span><strong>Pacientes >= 60 anos com permanência >= 15 dias</strong><div class="kpi-value">${{k.longa_permanencia_60_15}}</div></div>
+            <div class="card"><span class="badge badge-secondary">Idade + Longa</span><strong>Pacientes >= 60 anos com permanência >= 30 dias</strong><div class="kpi-value">${{k.longa_permanencia_60_30}}</div></div>
+          `;
+        }} else {{
+          kpisEl.innerHTML = '<div class="card">Erro ao obter KPIs de longa permanência</div>';
+        }}
+      }} else {{
+        kpisEl.innerHTML = `
+          <div class="card"><span class="badge {badge_class}">{badge_text}</span><strong>Total encontrado</strong><div class="kpi-value">${{data.total}}</div></div>
+          <div class="card"><span class="badge badge-info">Página atual</span><strong>Paginação</strong><div class="kpi-value">${{data.page}}</div></div>
+          <div class="card"><span class="badge badge-secondary">Lote visual</span><strong>Itens por página</strong><div class="kpi-value">${{data.page_size}}</div></div>
+        `;
+      }}
       rowsEl.innerHTML = items.length
         ? items.map(it => {{
             const meta = priorityMeta(it);
