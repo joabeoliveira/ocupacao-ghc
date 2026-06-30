@@ -141,7 +141,9 @@ def get_censo_kpis(
             )
         ) or 0
 
+        # Normaliza o leito para capturar variacoes da emergencia, ex.: 111.01 -> 111.
         leito_normalizado = func.trim(func.coalesce(OcupacaoLeitoGHC.leito, ""))
+        leito_base = func.substring_index(leito_normalizado, ".", 1)
         base_leitos = db.execute(
             select(
                 func.count().label("total_leitos"),
@@ -154,7 +156,7 @@ def get_censo_kpis(
                         (
                             and_(
                                 OcupacaoLeitoGHC.status_leito == "Ocupado",
-                                ~leito_normalizado.in_(EMERGENCIA_LEITOS),
+                                    ~leito_base.in_(EMERGENCIA_LEITOS),
                             ),
                             1,
                         ),
@@ -166,7 +168,7 @@ def get_censo_kpis(
                         (
                             and_(
                                 OcupacaoLeitoGHC.status_leito != "Bloqueado",
-                                ~leito_normalizado.in_(EMERGENCIA_LEITOS),
+                                    ~leito_base.in_(EMERGENCIA_LEITOS),
                             ),
                             1,
                         ),
