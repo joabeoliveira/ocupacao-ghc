@@ -18,6 +18,12 @@ class CensoKPIsResponse(BaseModel):
     longa_permanencia_60_anos: int
     longa_permanencia_60_15: int
     longa_permanencia_60_30: int
+    leitos_ocupados: int
+    leitos_livres: int
+    leitos_bloqueados: int
+    taxa_ocupacao_geral_percentual: float
+    taxa_ocupacao_operacional_percentual: float
+    taxa_ocupacao_ajustada_sem_emergencia_percentual: float
     ocupacao_por_unidade: list[OcupacaoPorUnidade]
 
 

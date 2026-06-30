@@ -6,7 +6,7 @@ from io import BytesIO
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import and_, desc, func, select
+from sqlalchemy import and_, case, desc, func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -15,6 +15,7 @@ from app.schemas import CensoKPIsResponse, OcupacaoPorUnidade, PacienteInternado
 
 
 router = APIRouter(prefix="/censo", tags=["Censo"])
+EMERGENCIA_LEITOS = {"111", "113", "114", "115", "116", "117"}
 
 
 def _resolve_snapshot_bounds(
@@ -104,6 +105,12 @@ def get_censo_kpis(
                 longa_permanencia_60_anos=0,
                 longa_permanencia_60_15=0,
                 longa_permanencia_60_30=0,
+                leitos_ocupados=0,
+                leitos_livres=0,
+                leitos_bloqueados=0,
+                taxa_ocupacao_geral_percentual=0.0,
+                taxa_ocupacao_operacional_percentual=0.0,
+                taxa_ocupacao_ajustada_sem_emergencia_percentual=0.0,
                 ocupacao_por_unidade=[],
             )
 
@@ -134,6 +141,61 @@ def get_censo_kpis(
             )
         ) or 0
 
+        leito_normalizado = func.trim(func.coalesce(OcupacaoLeitoGHC.leito, ""))
+        base_leitos = db.execute(
+            select(
+                func.count().label("total_leitos"),
+                func.sum(case((OcupacaoLeitoGHC.status_leito == "Ocupado", 1), else_=0)).label("leitos_ocupados"),
+                func.sum(case((OcupacaoLeitoGHC.status_leito == "Livre", 1), else_=0)).label("leitos_livres"),
+                func.sum(case((OcupacaoLeitoGHC.status_leito == "Bloqueado", 1), else_=0)).label("leitos_bloqueados"),
+                func.sum(case((OcupacaoLeitoGHC.status_leito != "Bloqueado", 1), else_=0)).label("leitos_operacionais"),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                OcupacaoLeitoGHC.status_leito == "Ocupado",
+                                ~leito_normalizado.in_(EMERGENCIA_LEITOS),
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("ocupados_sem_emergencia"),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                OcupacaoLeitoGHC.status_leito != "Bloqueado",
+                                ~leito_normalizado.in_(EMERGENCIA_LEITOS),
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("operacionais_sem_emergencia"),
+            )
+            .where(OcupacaoLeitoGHC.fonte_dado == "censo_diario")
+            .where(_date_filter_expression(data_inicio, data_fim))
+        ).one()
+
+        total_leitos = int(base_leitos.total_leitos or 0)
+        leitos_ocupados = int(base_leitos.leitos_ocupados or 0)
+        leitos_livres = int(base_leitos.leitos_livres or 0)
+        leitos_bloqueados = int(base_leitos.leitos_bloqueados or 0)
+        leitos_operacionais = int(base_leitos.leitos_operacionais or 0)
+        ocupados_sem_emergencia = int(base_leitos.ocupados_sem_emergencia or 0)
+        operacionais_sem_emergencia = int(base_leitos.operacionais_sem_emergencia or 0)
+
+        taxa_ocupacao_geral = round((leitos_ocupados / total_leitos) * 100, 2) if total_leitos else 0.0
+        taxa_ocupacao_operacional = (
+            round((leitos_ocupados / leitos_operacionais) * 100, 2) if leitos_operacionais else 0.0
+        )
+        taxa_ocupacao_ajustada_sem_emergencia = (
+            round((ocupados_sem_emergencia / operacionais_sem_emergencia) * 100, 2)
+            if operacionais_sem_emergencia
+            else 0.0
+        )
+
         unidades_query = (
             select(OcupacaoLeitoGHC.unidade, func.count().label("total_pacientes"))
             .select_from(OcupacaoLeitoGHC)
@@ -152,6 +214,12 @@ def get_censo_kpis(
             longa_permanencia_60_anos=0,
             longa_permanencia_60_15=0,
             longa_permanencia_60_30=0,
+            leitos_ocupados=0,
+            leitos_livres=0,
+            leitos_bloqueados=0,
+            taxa_ocupacao_geral_percentual=0.0,
+            taxa_ocupacao_operacional_percentual=0.0,
+            taxa_ocupacao_ajustada_sem_emergencia_percentual=0.0,
             ocupacao_por_unidade=[],
         )
 
@@ -163,6 +231,12 @@ def get_censo_kpis(
         longa_permanencia_60_anos=longa_60_anos,
         longa_permanencia_60_15=longa_60_15,
         longa_permanencia_60_30=longa_60_30,
+        leitos_ocupados=leitos_ocupados,
+        leitos_livres=leitos_livres,
+        leitos_bloqueados=leitos_bloqueados,
+        taxa_ocupacao_geral_percentual=taxa_ocupacao_geral,
+        taxa_ocupacao_operacional_percentual=taxa_ocupacao_operacional,
+        taxa_ocupacao_ajustada_sem_emergencia_percentual=taxa_ocupacao_ajustada_sem_emergencia,
         ocupacao_por_unidade=[
             OcupacaoPorUnidade(unidade=row.unidade, total_pacientes=row.total_pacientes) for row in unidades
         ],
