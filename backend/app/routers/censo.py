@@ -102,6 +102,8 @@ def get_censo_kpis(
                 longa_permanencia_30=0,
                 longa_permanencia_40=0,
                 longa_permanencia_60_anos=0,
+                longa_permanencia_60_15=0,
+                longa_permanencia_60_30=0,
                 ocupacao_por_unidade=[],
             )
 
@@ -121,6 +123,16 @@ def get_censo_kpis(
         longa_60_anos = db.scalar(
             select(func.count()).select_from(base_subquery).where(base_subquery.c.idade_anos >= 60)
         ) or 0
+        longa_60_15 = db.scalar(
+            select(func.count()).select_from(base_subquery).where(
+                and_(base_subquery.c.idade_anos >= 60, base_subquery.c.dias_internacao >= 15)
+            )
+        ) or 0
+        longa_60_30 = db.scalar(
+            select(func.count()).select_from(base_subquery).where(
+                and_(base_subquery.c.idade_anos >= 60, base_subquery.c.dias_internacao >= 30)
+            )
+        ) or 0
 
         unidades_query = (
             select(OcupacaoLeitoGHC.unidade, func.count().label("total_pacientes"))
@@ -138,6 +150,8 @@ def get_censo_kpis(
             longa_permanencia_30=0,
             longa_permanencia_40=0,
             longa_permanencia_60_anos=0,
+            longa_permanencia_60_15=0,
+            longa_permanencia_60_30=0,
             ocupacao_por_unidade=[],
         )
 
@@ -147,6 +161,8 @@ def get_censo_kpis(
         longa_permanencia_30=longa_30,
         longa_permanencia_40=longa_40,
         longa_permanencia_60_anos=longa_60_anos,
+        longa_permanencia_60_15=longa_60_15,
+        longa_permanencia_60_30=longa_60_30,
         ocupacao_por_unidade=[
             OcupacaoPorUnidade(unidade=row.unidade, total_pacientes=row.total_pacientes) for row in unidades
         ],
@@ -155,6 +171,8 @@ def get_censo_kpis(
 
 @router.get("/pacientes", response_model=PacientesInternadosPage)
 def get_pacientes_internados(
+    prontuario: str | None = Query(default=None),
+    nome: str | None = Query(default=None),
     especialidade: str | None = Query(default=None),
     unidade: str | None = Query(default=None),
     data_inicio: date | None = Query(default=None),
@@ -175,6 +193,10 @@ def get_pacientes_internados(
             base_query = base_query.where(OcupacaoLeitoGHC.especialidade == especialidade)
         if unidade:
             base_query = base_query.where(OcupacaoLeitoGHC.unidade == unidade)
+        if prontuario:
+            base_query = base_query.where(OcupacaoLeitoGHC.prontuario.like(f"%{prontuario}%"))
+        if nome:
+            base_query = base_query.where(OcupacaoLeitoGHC.nome_paciente.like(f"%{nome}%"))
         if min_dias is not None:
             base_query = base_query.where(OcupacaoLeitoGHC.dias_internacao >= min_dias)
         if idade_minima is not None:
@@ -235,6 +257,8 @@ def get_paciente_por_prontuario(
 
 @router.get("/export/xlsx")
 def export_pacientes_xlsx(
+    prontuario: str | None = Query(default=None),
+    nome: str | None = Query(default=None),
     especialidade: str | None = Query(default=None),
     unidade: str | None = Query(default=None),
     data_inicio: date | None = Query(default=None),
@@ -259,6 +283,10 @@ def export_pacientes_xlsx(
         base_query = base_query.where(OcupacaoLeitoGHC.especialidade == especialidade)
     if unidade:
         base_query = base_query.where(OcupacaoLeitoGHC.unidade == unidade)
+    if prontuario:
+        base_query = base_query.where(OcupacaoLeitoGHC.prontuario.like(f"%{prontuario}%"))
+    if nome:
+        base_query = base_query.where(OcupacaoLeitoGHC.nome_paciente.like(f"%{nome}%"))
     if min_dias is not None:
         base_query = base_query.where(OcupacaoLeitoGHC.dias_internacao >= min_dias)
     if idade_minima is not None:

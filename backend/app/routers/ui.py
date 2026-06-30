@@ -226,7 +226,7 @@ def dashboard_page() -> str:
     }
     .filters-grid {
       display:grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 10px;
       align-items:end;
     }
@@ -335,6 +335,14 @@ def dashboard_page() -> str:
 
         <section id="resumo" class="filters">
           <div class="filters-grid">
+            <div class="field">
+              <label for="prontuario">Prontuário</label>
+              <input id="prontuario" placeholder="ex: 123456" />
+            </div>
+            <div class="field">
+              <label for="nome">Nome</label>
+              <input id="nome" placeholder="ex: MARIA" />
+            </div>
             <div class="field">
               <label for="especialidade">Especialidade</label>
               <input id="especialidade" placeholder="ex: DERMATO" />
@@ -476,6 +484,8 @@ def dashboard_page() -> str:
     const unidadesChartEl = document.getElementById('unidadesChart');
     const unidadesResumoEl = document.getElementById('unidadesResumo');
     const rowsEl = document.getElementById('rows');
+    const prontuarioEl = document.getElementById('prontuario');
+    const nomeEl = document.getElementById('nome');
     const especialidadeEl = document.getElementById('especialidade');
     const unidadeEl = document.getElementById('unidade');
     const dataInicioEl = document.getElementById('dataInicio');
@@ -505,6 +515,8 @@ def dashboard_page() -> str:
         <div class="card"><span class="badge badge-error">Crítico</span><strong>>=30 dias</strong><div class="kpi-value">${data.longa_permanencia_30}</div></div>
         <div class="card"><span class="badge badge-error">Crítico+</span><strong>>=40 dias</strong><div class="kpi-value">${data.longa_permanencia_40}</div></div>
         <div class="card"><span class="badge badge-secondary">60+ anos</span><strong>Pacientes</strong><div class="kpi-value">${data.longa_permanencia_60_anos}</div></div>
+        <div class="card"><span class="badge badge-secondary">60+ e 15+</span><strong>Pacientes</strong><div class="kpi-value">${data.longa_permanencia_60_15}</div></div>
+        <div class="card"><span class="badge badge-secondary">60+ e 30+</span><strong>Pacientes</strong><div class="kpi-value">${data.longa_permanencia_60_30}</div></div>
         <div class="card"><span class="badge badge-success">Ativo</span><strong>Unidades ativas</strong><div class="kpi-value">${unidades.length}</div><div class="muted" style="margin-top:6px">Top ${topUnidades.length}${resto ? ` + ${resto} outras` : ''}</div></div>`;
       unidadesResumoEl.textContent = unidades.length
         ? `Mostrando as ${topUnidades.length} unidades com mais pacientes de um total de ${unidades.length}.`
@@ -612,6 +624,8 @@ def dashboard_page() -> str:
       const params = new URLSearchParams();
       params.set('page', page);
       params.set('page_size', pageSize);
+      if (prontuarioEl.value) params.set('prontuario', prontuarioEl.value);
+      if (nomeEl.value) params.set('nome', nomeEl.value);
       if (especialidadeEl.value) params.set('especialidade', especialidadeEl.value);
       if (unidadeEl.value) params.set('unidade', unidadeEl.value);
       if (dataInicioEl.value) params.set('data_inicio', dataInicioEl.value);
@@ -887,6 +901,14 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
         <section class="filters">
           <div class="filters-grid">
             <div class="field">
+              <label for="prontuario">Prontuário</label>
+              <input id="prontuario" placeholder="ex: 123456" />
+            </div>
+            <div class="field">
+              <label for="nome">Nome</label>
+              <input id="nome" placeholder="ex: MARIA" />
+            </div>
+            <div class="field">
               <label for="especialidade">Especialidade</label>
               <input id="especialidade" placeholder="ex: DERMATO" />
             </div>
@@ -988,6 +1010,8 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
     const diasMinimos = {('null' if default_min_dias is None else default_min_dias)};
     const kpisEl = document.getElementById('kpis');
     const rowsEl = document.getElementById('rows');
+    const prontuarioEl = document.getElementById('prontuario');
+    const nomeEl = document.getElementById('nome');
     const especialidadeEl = document.getElementById('especialidade');
     const unidadeEl = document.getElementById('unidade');
     const dataInicioEl = document.getElementById('dataInicio');
@@ -1020,6 +1044,8 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
       const params = new URLSearchParams();
       params.set('page', page);
       params.set('page_size', pageSize);
+      if (prontuarioEl.value) params.set('prontuario', prontuarioEl.value);
+      if (nomeEl.value) params.set('nome', nomeEl.value);
       if (especialidadeEl.value) params.set('especialidade', especialidadeEl.value);
       if (unidadeEl.value) params.set('unidade', unidadeEl.value);
       if (dataInicioEl.value) params.set('data_inicio', dataInicioEl.value);
