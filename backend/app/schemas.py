@@ -146,3 +146,22 @@ class EvolucaoPacienteResponse(BaseModel):
 
 class EvolucaoPacienteUpdate(BaseModel):
     evolucao: str | None = None
+
+
+class PendenciaAltaResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    prontuario: str
+    codigo: str
+    resolvida: bool
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class PendenciaAltaCreate(BaseModel):
+    codigo: str
+
+
+class PendenciaAltaResolve(BaseModel):
+    resolvida: bool = True

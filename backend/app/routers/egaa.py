@@ -9,8 +9,10 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 from fastapi.responses import StreamingResponse
 
+from datetime import datetime as dt_datetime
+
 from app.database import get_db
-from app.models import EgaaIntervencaoPaciente, EgaaTipoIntervencao
+from app.models import EgaaIntervencaoPaciente, EgaaPendenciaAlta, EgaaTipoIntervencao
 from app.schemas import (
     EgaaIntervencaoPacienteBatchCreate,
     EgaaIntervencaoPacienteCreate,
@@ -21,6 +23,9 @@ from app.schemas import (
     EgaaIntervencaoPorTipo,
     EgaaTipoIntervencaoCreate,
     EgaaTipoIntervencaoResponse,
+    PendenciaAltaCreate,
+    PendenciaAltaResolve,
+    PendenciaAltaResponse,
 )
 
 
@@ -286,3 +291,159 @@ def export_egaa_xlsx(db: Session = Depends(get_db)) -> StreamingResponse:
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": 'attachment; filename="egaa_resultados.xlsx"'},
     )
+
+
+# --- Pendencias para alta ---
+
+PENDENCIA_CODIGOS: set[str] = {
+    "regulacao", "ajuste_inr", "ajuste_medicamento", "tratamento_lesoes",
+    "antibioticoterapia", "definicao_diagnostica", "ajuste_laboratorial",
+    "exame_pendente", "aguarda_parecer_especialista", "definicao_terapeutica",
+    "reavaliacao_medica", "descompensacao_clinica", "procedimento_cirurgico",
+    "aguarda_gtt_por_eda", "aguarda_cirurgia_cardiaca", "manejo_clinico",
+    "manejo_sintomatico", "cuidados_paliativos", "cuidados_pos_operatorios",
+    "cuidados_fim_vida", "fragilidade_familiar", "vulnerabilidade_social",
+    "vulnerabilidade_socioeconomica", "vulnerabilidade_emocional",
+    "documento_identidade", "familia_nao_cooperativa", "aguarda_padi_pmec",
+    "aguarda_home_care", "aguarda_vaga_abrigo", "aguardando_documentacao",
+    "transporte_sanitario_eletivo", "familiar_acompanhante_alta",
+    "aguarda_leito_cuidados_prolongados", "aguarda_regulacao_transferencia",
+    "aguarda_regulacao_marcapasso",
+}
+
+PENDENCIA_ROTULOS: dict[str, str] = {
+    "regulacao": "Regulação",
+    "ajuste_inr": "Ajuste INR",
+    "ajuste_medicamento": "Ajuste de medicação",
+    "tratamento_lesoes": "Tratamento de lesões",
+    "antibioticoterapia": "Antibioticoterapia",
+    "definicao_diagnostica": "Definição diagnóstica",
+    "ajuste_laboratorial": "Ajuste laboratorial",
+    "exame_pendente": "Exame pendente",
+    "aguarda_parecer_especialista": "Aguarda parecer especialista",
+    "definicao_terapeutica": "Definição terapêutica",
+    "reavaliacao_medica": "Reavaliação médica",
+    "descompensacao_clinica": "Descompensação clínica",
+    "procedimento_cirurgico": "Procedimento cirúrgico",
+    "aguarda_gtt_por_eda": "Aguarda GTT por EDA",
+    "aguarda_cirurgia_cardiaca": "Aguarda cirurgia cardíaca",
+    "manejo_clinico": "Manejo clínico",
+    "manejo_sintomatico": "Manejo sintomático",
+    "cuidados_paliativos": "Cuidados paliativos",
+    "cuidados_pos_operatorios": "Cuidados pós-operatórios",
+    "cuidados_fim_vida": "Cuidados de fim de vida",
+    "fragilidade_familiar": "Fragilidade familiar",
+    "vulnerabilidade_social": "Vulnerabilidade social",
+    "vulnerabilidade_socioeconomica": "Vulnerabilidade socioeconômica",
+    "vulnerabilidade_emocional": "Vulnerabilidade emocional",
+    "documento_identidade": "Documento de identidade",
+    "familia_nao_cooperativa": "Família não cooperativa",
+    "aguarda_padi_pmec": "Aguarda PADI/PMEC",
+    "aguarda_home_care": "Aguarda home care",
+    "aguarda_vaga_abrigo": "Aguarda vaga em abrigo",
+    "aguardando_documentacao": "Aguardando documentação",
+    "transporte_sanitario_eletivo": "Transporte sanitário eletivo",
+    "familiar_acompanhante_alta": "Familiar acompanhante para alta",
+    "aguarda_leito_cuidados_prolongados": "Aguarda leito cuidados prolongados",
+    "aguarda_regulacao_transferencia": "Aguarda regulação transferência",
+    "aguarda_regulacao_marcapasso": "Aguarda regulação marcapasso",
+}
+
+
+@router.get("/pendencia/codigos")
+def listar_codigos_pendencia() -> list[dict[str, str]]:
+    return [
+        {"codigo": codigo, "rotulo": PENDENCIA_ROTULOS.get(codigo, codigo)}
+        for codigo in sorted(PENDENCIA_CODIGOS)
+    ]
+
+
+@router.get("/pendencia/{prontuario}", response_model=list[PendenciaAltaResponse])
+def listar_pendencias(
+    prontuario: str,
+    db: Session = Depends(get_db),
+) -> list[PendenciaAltaResponse]:
+    rows = db.execute(
+        select(EgaaPendenciaAlta)
+        .where(EgaaPendenciaAlta.prontuario == prontuario)
+        .order_by(EgaaPendenciaAlta.resolvida, EgaaPendenciaAlta.codigo)
+    ).scalars().all()
+    return [PendenciaAltaResponse.model_validate(row) for row in rows]
+
+
+@router.post("/pendencia/{prontuario}", response_model=PendenciaAltaResponse, status_code=201)
+def adicionar_pendencia(
+    prontuario: str,
+    payload: PendenciaAltaCreate,
+    db: Session = Depends(get_db),
+) -> PendenciaAltaResponse:
+    if payload.codigo not in PENDENCIA_CODIGOS:
+        raise HTTPException(status_code=400, detail=f"Código de pendência inválido: {payload.codigo}")
+
+    existing = db.scalar(
+        select(EgaaPendenciaAlta).where(
+            EgaaPendenciaAlta.prontuario == prontuario,
+            EgaaPendenciaAlta.codigo == payload.codigo,
+        )
+    )
+    if existing is not None:
+        if existing.resolvida:
+            existing.resolvida = False
+            existing.updated_at = dt_datetime.utcnow()
+            db.commit()
+            db.refresh(existing)
+            return PendenciaAltaResponse.model_validate(existing)
+        raise HTTPException(status_code=409, detail="Pendência já cadastrada para este paciente.")
+
+    now = dt_datetime.utcnow()
+    row = EgaaPendenciaAlta(
+        prontuario=prontuario,
+        codigo=payload.codigo,
+        resolvida=False,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return PendenciaAltaResponse.model_validate(row)
+
+
+@router.put("/pendencia/{prontuario}/{pendencia_id}", response_model=PendenciaAltaResponse)
+def atualizar_pendencia(
+    prontuario: str,
+    pendencia_id: int,
+    payload: PendenciaAltaResolve,
+    db: Session = Depends(get_db),
+) -> PendenciaAltaResponse:
+    row = db.scalar(
+        select(EgaaPendenciaAlta).where(
+            EgaaPendenciaAlta.id == pendencia_id,
+            EgaaPendenciaAlta.prontuario == prontuario,
+        )
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Pendência não encontrada.")
+    row.resolvida = payload.resolvida
+    row.updated_at = dt_datetime.utcnow()
+    db.commit()
+    db.refresh(row)
+    return PendenciaAltaResponse.model_validate(row)
+
+
+@router.delete("/pendencia/{prontuario}/{pendencia_id}", status_code=204)
+def remover_pendencia(
+    prontuario: str,
+    pendencia_id: int,
+    db: Session = Depends(get_db),
+) -> None:
+    row = db.scalar(
+        select(EgaaPendenciaAlta).where(
+            EgaaPendenciaAlta.id == pendencia_id,
+            EgaaPendenciaAlta.prontuario == prontuario,
+        )
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Pendência não encontrada.")
+    db.delete(row)
+    db.commit()

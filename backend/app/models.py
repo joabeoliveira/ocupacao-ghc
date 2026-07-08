@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import CHAR, Boolean, Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import CHAR, Boolean, Date, DateTime, ForeignKey, Integer, SmallInteger, String, Text
 from sqlalchemy.dialects.mysql import ENUM
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -58,6 +58,17 @@ class EgaaEvolucaoPaciente(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     prontuario: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
     evolucao: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class EgaaPendenciaAlta(Base):
+    __tablename__ = "egaa_pendencia_alta"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    prontuario: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    codigo: Mapped[str] = mapped_column(String(80), nullable=False, comment="Codigo da pendencia")
+    resolvida: Mapped[bool] = mapped_column(SmallInteger, nullable=False, default=False)
     created_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 

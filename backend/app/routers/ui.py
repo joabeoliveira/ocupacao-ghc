@@ -1462,6 +1462,29 @@ def paciente_detail_route(prontuario: str) -> str:
           <section class="section" style="grid-column: 1 / -1;">
             <div class="section-header">
               <div>
+                <h2>Pendências para alta</h2>
+                <p>Adicione ou remova pendências — itens resolvidos permanecem marcados no histórico.</p>
+              </div>
+            </div>
+            <div class="section-body">
+              <div class="field" style="margin-bottom:12px;">
+                <label for="pendenciaSelect">Adicionar pendência</label>
+                <div style="display:flex;gap:8px;">
+                  <select id="pendenciaSelect" style="flex:1;padding:10px 12px;border-radius:10px;border:1px solid #cfd8e3;background:#fff;">
+                    <option value="">Selecione...</option>
+                  </select>
+                  <button type="button" id="addPendencia" class="secondary" style="white-space:nowrap;">Adicionar</button>
+                </div>
+              </div>
+              <div id="pendenciaList" style="display:flex;flex-wrap:wrap;gap:8px;min-height:40px;">
+                <span class="muted">Carregando pendências...</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="section" style="grid-column: 1 / -1;">
+            <div class="section-header">
+              <div>
                 <h2>Linha do tempo EGAA</h2>
                 <p>Intervenções registradas para este prontuário.</p>
               </div>
@@ -1703,6 +1726,101 @@ def paciente_detail_route(prontuario: str) -> str:
       return list;
     }}
 
+    // --- Pendencias para alta ---
+    const pendenciaSelectEl = document.getElementById('pendenciaSelect');
+    const pendenciaListEl = document.getElementById('pendenciaList');
+    const addPendenciaBtn = document.getElementById('addPendencia');
+
+    async function loadCodigosPendencia() {{
+      const res = await fetch(`${{API_PREFIX}}/egaa/pendencia/codigos`);
+      if (!res.ok) return;
+      const items = await res.json();
+      if (!Array.isArray(items)) return;
+      if (pendenciaSelectEl) {{
+        pendenciaSelectEl.innerHTML = '<option value="">Selecione...</option>' +
+          items.map(item => `<option value="${{item.codigo}}">${{item.rotulo}}</option>`).join('');
+      }}
+    }}
+
+    async function loadPendencias() {{
+      const res = await fetch(`${{API_PREFIX}}/egaa/pendencia/${{encodeURIComponent(PRONTUARIO)}}`);
+      if (!res.ok) {{
+        if (pendenciaListEl) pendenciaListEl.innerHTML = '<span class="muted">Erro ao carregar pendências.</span>';
+        return;
+      }}
+      const items = await res.json();
+      const list = Array.isArray(items) ? items : [];
+      if (!pendenciaListEl) return;
+      if (!list.length) {{
+        pendenciaListEl.innerHTML = '<span class="muted">Nenhuma pendência cadastrada.</span>';
+        return;
+      }}
+      pendenciaListEl.innerHTML = list.map(item => {{
+        const resolvida = item.resolvida;
+        const label = pendenciaSelectEl
+          ? (pendenciaSelectEl.querySelector(`option[value="${{item.codigo}}"]`)?.textContent || item.codigo)
+          : item.codigo;
+        const bg = resolvida ? '#E8F5E9' : '#FFF3E0';
+        const border = resolvida ? '#A5D6A7' : '#FFE0B2';
+        const color = resolvida ? '#2E7D32' : '#E65100';
+        return `<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:${{bg}};border:1px solid ${{border}};font-size:13px;font-weight:600;">
+          <span style="color:${{color}};">${{label}}</span>
+          <button type="button" data-pendencia-id="${{item.id}}" data-action="toggle-pendencia" style="background:none;border:none;cursor:pointer;padding:0;font-size:14px;line-height:1;color:${{resolvida ? '#2E7D32' : '#E65100'}}" title="${{resolvida ? 'Reabrir' : 'Resolver'}}">
+            ${{resolvida ? '&#10003;' : '&#9711;'}}
+          </button>
+          <button type="button" data-pendencia-id="${{item.id}}" data-action="remove-pendencia" style="background:none;border:none;cursor:pointer;padding:0;font-size:14px;line-height:1;color:#C62828;" title="Remover">&times;</button>
+        </span>`;
+      }}).join('');
+    }}
+
+    if (addPendenciaBtn) {{
+      addPendenciaBtn.addEventListener('click', async () => {{
+        const codigo = pendenciaSelectEl ? pendenciaSelectEl.value : '';
+        if (!codigo) return;
+        const res = await fetch(`${{API_PREFIX}}/egaa/pendencia/${{encodeURIComponent(PRONTUARIO)}}`, {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ codigo }}),
+        }});
+        if (!res.ok) {{
+          if (res.status === 409) alert('Pendência já cadastrada.');
+          else alert('Erro ao adicionar pendência.');
+          return;
+        }}
+        if (pendenciaSelectEl) pendenciaSelectEl.value = '';
+        await loadPendencias();
+      }});
+    }}
+
+    if (pendenciaListEl) {{
+      pendenciaListEl.addEventListener('click', async (event) => {{
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        const action = target.getAttribute('data-action');
+        const id = target.getAttribute('data-pendencia-id');
+        if (!action || !id) return;
+
+        if (action === 'toggle-pendencia') {{
+          const pendencia = await (await fetch(`${{API_PREFIX}}/egaa/pendencia/${{encodeURIComponent(PRONTUARIO)}}/${{id}}`)).json();
+          const novaResolvida = !pendencia.resolvida;
+          await fetch(`${{API_PREFIX}}/egaa/pendencia/${{encodeURIComponent(PRONTUARIO)}}/${{id}}`, {{
+            method: 'PUT',
+            headers: {{ 'Content-Type': 'application/json' }},
+            body: JSON.stringify({{ resolvida: novaResolvida }}),
+          }});
+          await loadPendencias();
+        }}
+
+        if (action === 'remove-pendencia') {{
+          if (!confirm('Remover esta pendência?')) return;
+          await fetch(`${{API_PREFIX}}/egaa/pendencia/${{encodeURIComponent(PRONTUARIO)}}/${{id}}`, {{
+            method: 'DELETE',
+          }});
+          await loadPendencias();
+        }}
+      }});
+    }}
+
     draftsEl.addEventListener('input', (event) => {{
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
@@ -1829,6 +1947,8 @@ def paciente_detail_route(prontuario: str) -> str:
       await loadPaciente();
       await loadTipos();
       await loadHistorico();
+      await loadCodigosPendencia();
+      await loadPendencias();
     }})();
   </script>
 </body>
