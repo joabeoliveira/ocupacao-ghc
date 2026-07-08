@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from io import BytesIO
 
 import pandas as pd
@@ -10,8 +10,15 @@ from sqlalchemy import and_, case, desc, func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import EgaaIntervencaoPaciente, OcupacaoLeitoGHC
-from app.schemas import CensoKPIsResponse, OcupacaoPorUnidade, PacienteInternadoResponse, PacientesInternadosPage
+from app.models import EgaaEvolucaoPaciente, EgaaIntervencaoPaciente, OcupacaoLeitoGHC
+from app.schemas import (
+    CensoKPIsResponse,
+    EvolucaoPacienteResponse,
+    EvolucaoPacienteUpdate,
+    OcupacaoPorUnidade,
+    PacienteInternadoResponse,
+    PacientesInternadosPage,
+)
 
 
 router = APIRouter(prefix="/censo", tags=["Censo"])
@@ -326,9 +333,44 @@ def get_paciente_por_prontuario(
     if row is None:
         raise HTTPException(status_code=404, detail="Paciente não encontrado.")
     egas_map = _egaa_summary_map(db, [prontuario])
-    return PacienteInternadoResponse.model_validate(row).model_copy(
-        update=egas_map.get(prontuario, {"egaa_total_atuacoes": 0, "egaa_ultima_atuacao": None})
+
+    evolucao_row = db.scalar(
+        select(EgaaEvolucaoPaciente).where(EgaaEvolucaoPaciente.prontuario == prontuario)
     )
+    evolucao_text = evolucao_row.evolucao if evolucao_row else None
+
+    return PacienteInternadoResponse.model_validate(row).model_copy(
+        update={
+            **egas_map.get(prontuario, {"egaa_total_atuacoes": 0, "egaa_ultima_atuacao": None}),
+            "evolucao": evolucao_text,
+        }
+    )
+
+
+@router.put("/paciente/{prontuario}/evolucao", response_model=EvolucaoPacienteResponse)
+def update_paciente_evolucao(
+    prontuario: str,
+    payload: EvolucaoPacienteUpdate,
+    db: Session = Depends(get_db),
+) -> EvolucaoPacienteResponse:
+    now = datetime.utcnow()
+    row = db.scalar(
+        select(EgaaEvolucaoPaciente).where(EgaaEvolucaoPaciente.prontuario == prontuario)
+    )
+    if row is None:
+        row = EgaaEvolucaoPaciente(
+            prontuario=prontuario,
+            evolucao=payload.evolucao,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(row)
+    else:
+        row.evolucao = payload.evolucao
+        row.updated_at = now
+    db.commit()
+    db.refresh(row)
+    return EvolucaoPacienteResponse.model_validate(row)
 
 
 @router.get("/export/xlsx")

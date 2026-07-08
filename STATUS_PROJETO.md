@@ -84,6 +84,16 @@ A correção do censo diário foi implementada e validada no ambiente provisóri
 - Permanece um `SyntaxWarning` antigo em `backend/app/routers/ui.py` relacionado a escape de regex JavaScript embutida em string Python.
 - Não bloqueia execução, mas recomenda-se ajuste posterior de higiene de código.
 
+## Atualizações recentes (08/07)
+
+- Implementado campo **Evolução do paciente** na página de detalhe (`/paciente/{prontuario}`):
+  - Nova tabela `egaa_evolucao_paciente` (migration `006_create_egaa_evolucao_paciente.sql`).
+  - Modelo `EgaaEvolucaoPaciente` em `backend/app/models.py`.
+  - Schema `EvolucaoPacienteResponse` e `EvolucaoPacienteUpdate` em `backend/app/schemas.py`.
+  - Endpoint `PUT /api/censo/paciente/{prontuario}/evolucao` em `backend/app/routers/censo.py`.
+  - Card "Evolução do paciente" logo abaixo do "Resumo clínico" na UI, com textarea grande e botão "Salvar evolução".
+  - Evolução carregada automaticamente ao abrir a página do paciente e salva via requisição PUT assíncrona.
+
 ## Atualizações recentes (30/06)
 
 - Corrigido o `SyntaxWarning` em `backend/app/routers/ui.py` (escape de regex JavaScript). Commit aplicado no repositório.

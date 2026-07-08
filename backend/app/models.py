@@ -52,6 +52,16 @@ class EgaaTipoIntervencao(Base):
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
+class EgaaEvolucaoPaciente(Base):
+    __tablename__ = "egaa_evolucao_paciente"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    prontuario: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
+    evolucao: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class EgaaIntervencaoPaciente(Base):
     __tablename__ = "egaa_intervencao_paciente"
 

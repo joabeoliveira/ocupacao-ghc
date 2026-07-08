@@ -44,6 +44,7 @@ class PacienteInternadoResponse(BaseModel):
     cid_internacao_codigo: str | None = None
     cid_internacao_descricao: str | None = None
     data_snapshot: date | None = None
+    evolucao: str | None = None
     egaa_total_atuacoes: int = 0
     egaa_ultima_atuacao: date | None = None
 
@@ -133,3 +134,15 @@ class EgaaIndicadoresResponse(BaseModel):
     por_status: list[EgaaIntervencaoPorStatus]
     por_tipo: list[EgaaIntervencaoPorTipo]
     por_mes: list[EgaaIntervencaoPorMes]
+
+
+class EvolucaoPacienteResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    prontuario: str
+    evolucao: str | None = None
+    updated_at: datetime | None = None
+
+
+class EvolucaoPacienteUpdate(BaseModel):
+    evolucao: str | None = None

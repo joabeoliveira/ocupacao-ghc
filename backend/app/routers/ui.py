@@ -1423,6 +1423,22 @@ def paciente_detail_route(prontuario: str) -> str:
           <section class="section">
             <div class="section-header">
               <div>
+                <h2>Evolução do paciente</h2>
+                <p>Diário do EGAA — descreva a evolução clínica e social.</p>
+              </div>
+            </div>
+            <div class="section-body">
+              <textarea id="evolucao" style="width:100%;min-height:140px;padding:12px;border-radius:10px;border:1px solid #cfd8e3;box-sizing:border-box;background:#fff;font:inherit;resize:vertical;" placeholder='Descreva a evolução do paciente, incluindo data e profissional.&#10;&#10;Ex:&#10;ENF: 21/01/2026 - Enf Eduardo: Paciente...&#10;SESO: 25/02/2026: Abordagem social...'></textarea>
+              <div class="actions">
+                <button type="button" id="salvarEvolucao">Salvar evolução</button>
+                <span id="evolucaoStatus" class="muted" style="font-size:13px;"></span>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-header">
+              <div>
                 <h2>Nova atuação EGAA</h2>
                 <p>Adicione várias atuações para o mesmo paciente antes de salvar.</p>
               </div>
@@ -1640,6 +1656,8 @@ def paciente_detail_route(prontuario: str) -> str:
         <div><strong>CID:</strong> ${{data.cid_internacao_codigo || '--'}} ${{data.cid_internacao_descricao ? '- ' + data.cid_internacao_descricao : ''}}</div>
         <div><strong>Internação:</strong> ${{fmtDate(data.data_internacao)}}</div>
       `;
+      const evolucaoEl = document.getElementById('evolucao');
+      if (evolucaoEl) evolucaoEl.value = data.evolucao || '';
       return data;
     }}
 
@@ -1779,6 +1797,31 @@ def paciente_detail_route(prontuario: str) -> str:
       await loadTipos();
       await loadHistorico();
     }});
+
+    const salvarEvolucaoBtn = document.getElementById('salvarEvolucao');
+    const evolucaoStatusEl = document.getElementById('evolucaoStatus');
+    if (salvarEvolucaoBtn) {{
+      salvarEvolucaoBtn.addEventListener('click', async () => {{
+        const evolucaoEl = document.getElementById('evolucao');
+        if (!evolucaoEl) return;
+        const texto = evolucaoEl.value;
+        evolucaoStatusEl.textContent = 'Salvando...';
+        try {{
+          const res = await fetch(`${{API_PREFIX}}/censo/paciente/${{encodeURIComponent(PRONTUARIO)}}/evolucao`, {{
+            method: 'PUT',
+            headers: {{ 'Content-Type': 'application/json' }},
+            body: JSON.stringify({{ evolucao: texto }}),
+          }});
+          if (!res.ok) {{
+            evolucaoStatusEl.textContent = 'Erro ao salvar evolução.';
+            return;
+          }}
+          evolucaoStatusEl.textContent = 'Evolução salva em ' + new Date().toLocaleTimeString('pt-BR');
+        }} catch {{
+          evolucaoStatusEl.textContent = 'Falha de rede ao salvar.';
+        }}
+      }});
+    }}
 
     drafts = [createDraft()];
     renderDrafts();
