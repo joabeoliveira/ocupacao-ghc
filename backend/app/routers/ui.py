@@ -1709,16 +1709,141 @@ def paciente_detail_route(prontuario: str) -> str:
       timelineEl.innerHTML = list.length ? list.map(item => {{
         const tipoNome = escapeHtml(tiposById[item.tipo_intervencao_id] || ('ID ' + (item.tipo_intervencao_id || '--')));
         const dataAtuacao = item.data_atuacao ? fmtDate(item.data_atuacao) : '--';
+        const updatedText = item.updated_at ? fmtDate(item.updated_at) : (item.created_at ? fmtDate(item.created_at) : '--');
         return `
-        <div class="timeline-item">
-          <div class="badge badge-info">${{escapeHtml(item.status || 'sem status')}}</div>
-          <div class="timeline-title">${{escapeHtml(item.titulo || '--')}}</div>
-          <div class="timeline-meta">Tipo: ${{tipoNome}} · Atuação: ${{dataAtuacao}} · Responsável: ${{escapeHtml(item.usuario_responsavel || '--')}}</div>
-          <div class="timeline-meta">${{escapeHtml(item.descricao || '')}}</div>
-          <div class="timeline-meta">Atualizado em ${{fmtDate(item.updated_at || item.created_at)}}</div>
+        <div class="timeline-item" data-id="${{item.id}}">
+          <div style="display:flex;align-items:start;justify-content:space-between;gap:8px;">
+            <div style="flex:1;">
+              <div class="badge badge-info">${{escapeHtml(item.status || 'sem status')}}</div>
+              <div class="timeline-title">${{escapeHtml(item.titulo || '--')}}</div>
+              <div class="timeline-meta">Tipo: ${{tipoNome}} · Atuação: ${{dataAtuacao}} · Responsável: ${{escapeHtml(item.usuario_responsavel || '--')}}</div>
+              <div class="timeline-meta">${{escapeHtml(item.descricao || '')}}</div>
+              <div class="timeline-meta">Atualizado em ${{updatedText}}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
+              <button type="button" class="edit-intervencao" data-id="${{item.id}}" style="padding:4px 8px;font-size:12px;background:#EEF5FA;color:var(--brand);border:1px solid var(--panel-border);border-radius:6px;cursor:pointer;">✏️ Editar</button>
+              <button type="button" class="delete-intervencao" data-id="${{item.id}}" style="padding:4px 8px;font-size:12px;background:#FDECEC;color:var(--error);border:1px solid rgba(198,40,40,0.16);border-radius:6px;cursor:pointer;">🗑️ Excluir</button>
+            </div>
+          </div>
+          <div class="edit-form" id="edit-form-${{item.id}}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid #edf2f7;">
+            <div class="field">
+              <label>Tipo de intervenção</label>
+              <select class="edit-tipo" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #cfd8e3;background:#fff;">
+                <option value="">Selecione...</option>
+                ${{tiposOptions.map(t => `<option value="${{t.id}}" ${{t.id === item.tipo_intervencao_id ? 'selected' : ''}}>${{escapeHtml(t.nome)}}</option>`).join('')}}
+              </select>
+            </div>
+            <div class="field">
+              <label>Descrição</label>
+              <textarea class="edit-descricao" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #cfd8e3;background:#fff;min-height:60px;font:inherit;resize:vertical;">${{escapeHtml(item.descricao || '')}}</textarea>
+            </div>
+            <div class="row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+              <div class="field">
+                <label>Status</label>
+                <select class="edit-status" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #cfd8e3;background:#fff;">
+                  <option value="aberta" ${{item.status === 'aberta' ? 'selected' : ''}}>Aberta</option>
+                  <option value="em_andamento" ${{item.status === 'em_andamento' ? 'selected' : ''}}>Em andamento</option>
+                  <option value="concluida" ${{item.status === 'concluida' ? 'selected' : ''}}>Concluída</option>
+                  <option value="cancelada" ${{item.status === 'cancelada' ? 'selected' : ''}}>Cancelada</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Responsável</label>
+                <input class="edit-responsavel" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #cfd8e3;background:#fff;" value="${{escapeHtml(item.usuario_responsavel || '')}}" />
+              </div>
+            </div>
+            <div class="row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+              <div class="field">
+                <label>Data da atuação</label>
+                <input class="edit-data-atuacao" type="date" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #cfd8e3;background:#fff;" value="${{item.data_atuacao || ''}}" />
+              </div>
+              <div class="field">
+                <label>Observação</label>
+                <input class="edit-observacao" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #cfd8e3;background:#fff;" value="${{escapeHtml(item.observacao || '')}}" />
+              </div>
+            </div>
+            <div class="actions" style="margin-top:8px;">
+              <button type="button" class="save-edit" data-id="${{item.id}}" style="padding:8px 12px;border-radius:8px;border:none;background:var(--brand);color:#fff;cursor:pointer;font-weight:600;">Salvar</button>
+              <button type="button" class="cancel-edit" data-id="${{item.id}}" style="padding:8px 12px;border-radius:8px;border:1px solid var(--panel-border);background:#EEF5FA;color:var(--brand);cursor:pointer;font-weight:600;">Cancelar</button>
+              <span class="edit-status-msg" style="font-size:13px;color:var(--muted);"></span>
+            </div>
+          </div>
         </div>
       `;
       }}).join('') : '<div class="muted">Nenhuma intervenção registrada para este paciente.</div>';
+
+      // --- Eventos de editar/excluir ---
+      timelineEl.querySelectorAll('.edit-intervencao').forEach(btn => {{
+        btn.addEventListener('click', () => {{
+          const id = btn.getAttribute('data-id');
+          const form = document.getElementById('edit-form-' + id);
+          if (form) form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }});
+      }});
+
+      timelineEl.querySelectorAll('.cancel-edit').forEach(btn => {{
+        btn.addEventListener('click', () => {{
+          const id = btn.getAttribute('data-id');
+          const form = document.getElementById('edit-form-' + id);
+          if (form) form.style.display = 'none';
+        }});
+      }});
+
+      timelineEl.querySelectorAll('.save-edit').forEach(btn => {{
+        btn.addEventListener('click', async () => {{
+          const id = btn.getAttribute('data-id');
+          const form = document.getElementById('edit-form-' + id);
+          if (!form) return;
+          const msgEl = form.querySelector('.edit-status-msg');
+          msgEl.textContent = 'Salvando...';
+          try {{
+            const tipoEl = form.querySelector('.edit-tipo');
+            const descEl = form.querySelector('.edit-descricao');
+            const statusEl = form.querySelector('.edit-status');
+            const respEl = form.querySelector('.edit-responsavel');
+            const dataEl = form.querySelector('.edit-data-atuacao');
+            const obsEl = form.querySelector('.edit-observacao');
+            const tipoNome = tiposById[Number(tipoEl.value)] || 'Atuação EGAA';
+            const payload = {{
+              ocupacao_leito_id: null,
+              prontuario: PRONTUARIO,
+              tipo_intervencao_id: Number(tipoEl.value),
+              titulo: tipoNome,
+              descricao: descEl.value.trim() || null,
+              status: statusEl.value,
+              usuario_responsavel: respEl.value.trim() || null,
+              data_atuacao: dataEl.value || null,
+              data_prevista: null,
+              data_conclusao: null,
+              observacao: obsEl.value.trim() || null,
+            }};
+            const res = await fetch(`${{API_PREFIX}}/egaa/intervencoes/${{id}}`, {{
+              method: 'PUT',
+              headers: {{ 'Content-Type': 'application/json' }},
+              body: JSON.stringify(payload),
+            }});
+            if (!res.ok) {{
+              msgEl.textContent = 'Erro ao salvar.';
+              return;
+            }}
+            msgEl.textContent = 'Salvo!';
+            form.style.display = 'none';
+            await loadHistorico();
+          }} catch {{
+            msgEl.textContent = 'Falha de rede.';
+          }}
+        }});
+      }});
+
+      timelineEl.querySelectorAll('.delete-intervencao').forEach(btn => {{
+        btn.addEventListener('click', async () => {{
+          const id = btn.getAttribute('data-id');
+          if (!confirm('Excluir esta atuação permanentemente?')) return;
+          const res = await fetch(`${{API_PREFIX}}/egaa/intervencoes/${{id}}`, {{ method: 'DELETE' }});
+          if (!res.ok) {{ alert('Erro ao excluir.'); return; }}
+          await loadHistorico();
+        }});
+      }});
       return list;
     }}
 

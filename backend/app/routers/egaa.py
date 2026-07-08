@@ -107,6 +107,53 @@ def create_intervencao(
     return EgaaIntervencaoPacienteResponse.model_validate(row)
 
 
+@router.get("/intervencoes/{intervencao_id}", response_model=EgaaIntervencaoPacienteResponse)
+def get_intervencao(
+    intervencao_id: int,
+    db: Session = Depends(get_db),
+) -> EgaaIntervencaoPacienteResponse:
+    row = db.scalar(select(EgaaIntervencaoPaciente).where(EgaaIntervencaoPaciente.id == intervencao_id))
+    if row is None:
+        raise HTTPException(status_code=404, detail="Intervenção não encontrada.")
+    return EgaaIntervencaoPacienteResponse.model_validate(row)
+
+
+@router.put("/intervencoes/{intervencao_id}", response_model=EgaaIntervencaoPacienteResponse)
+def update_intervencao(
+    intervencao_id: int,
+    payload: EgaaIntervencaoPacienteCreate,
+    db: Session = Depends(get_db),
+) -> EgaaIntervencaoPacienteResponse:
+    row = db.scalar(select(EgaaIntervencaoPaciente).where(EgaaIntervencaoPaciente.id == intervencao_id))
+    if row is None:
+        raise HTTPException(status_code=404, detail="Intervenção não encontrada.")
+
+    tipo = db.scalar(select(EgaaTipoIntervencao).where(EgaaTipoIntervencao.id == payload.tipo_intervencao_id))
+    if tipo is None:
+        raise HTTPException(status_code=404, detail="Tipo de intervenção não encontrado.")
+
+    for field, value in payload.model_dump(exclude_none=True).items():
+        setattr(row, field, value)
+    if row.data_atuacao is None:
+        row.data_atuacao = date.today()
+    row.updated_at = dt_datetime.utcnow()
+    db.commit()
+    db.refresh(row)
+    return EgaaIntervencaoPacienteResponse.model_validate(row)
+
+
+@router.delete("/intervencoes/{intervencao_id}", status_code=204)
+def delete_intervencao(
+    intervencao_id: int,
+    db: Session = Depends(get_db),
+) -> None:
+    row = db.scalar(select(EgaaIntervencaoPaciente).where(EgaaIntervencaoPaciente.id == intervencao_id))
+    if row is None:
+        raise HTTPException(status_code=404, detail="Intervenção não encontrada.")
+    db.delete(row)
+    db.commit()
+
+
 @router.post("/intervencoes/lote", response_model=list[EgaaIntervencaoPacienteResponse], status_code=201)
 def create_intervencoes_lote(
     payload: EgaaIntervencaoPacienteBatchCreate,
