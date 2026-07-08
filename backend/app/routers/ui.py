@@ -1579,10 +1579,6 @@ def paciente_detail_route(prontuario: str) -> str:
             </select>
           </div>
           <div class="field">
-            <label>Título</label>
-            <input data-field="titulo" data-index="${{index}}" required placeholder="Ex: Pendência para alta" value="${{escapeHtml(draft.titulo || '')}}" />
-          </div>
-          <div class="field">
             <label>Descrição</label>
             <textarea data-field="descricao" data-index="${{index}}" placeholder="Detalhe a atuação do EGAA">${{escapeHtml(draft.descricao || '')}}</textarea>
           </div>
@@ -1867,14 +1863,12 @@ def paciente_detail_route(prontuario: str) -> str:
             if (!item.tipo_intervencao_id) {{
               throw new Error('Selecione o tipo de intervenção em todas as atuações preenchidas.');
             }}
-            if (!item.titulo.trim()) {{
-              throw new Error('Informe o título de todas as atuações preenchidas.');
-            }}
+            const tipoNome = tiposById[item.tipo_intervencao_id] || item.titulo.trim() || 'Atuação EGAA';
             return {{
               ocupacao_leito_id: null,
               prontuario: PRONTUARIO,
               tipo_intervencao_id: Number(item.tipo_intervencao_id),
-              titulo: item.titulo.trim(),
+              titulo: tipoNome,
               descricao: item.descricao.trim() || null,
               status: item.status,
               usuario_responsavel: item.usuario_responsavel.trim() || null,
