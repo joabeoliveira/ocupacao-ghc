@@ -17,3 +17,5 @@ dados/
 *.csv
 *.xls
 *.xlsx
+
+.vscode/
