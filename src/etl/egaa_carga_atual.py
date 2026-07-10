@@ -191,3 +191,140 @@ def write_egaa_sql(path: Path, egga_rows: list[dict[str, Any]]) -> None:
 
     path.write_text("\n".join(lines), encoding="utf-8")
 
+
+PENDENCIA_ROTULOS: dict[str, str] = {
+    "regulacao": "Regulação",
+    "ajuste_inr": "Ajuste INR",
+    "ajuste_medicamento": "Ajuste de medicação",
+    "tratamento_lesoes": "Tratamento de lesões",
+    "antibioticoterapia": "Antibioticoterapia",
+    "definicao_diagnostica": "Definição diagnóstica",
+    "ajuste_laboratorial": "Ajuste laboratorial",
+    "exame_pendente": "Exame pendente",
+    "aguarda_parecer_especialista": "Aguarda parecer especialista",
+    "definicao_terapeutica": "Definição terapêutica",
+    "reavaliacao_medica": "Reavaliação médica",
+    "descompensacao_clinica": "Descompensação clínica",
+    "procedimento_cirurgico": "Procedimento cirúrgico",
+    "aguarda_gtt_por_eda": "Aguarda GTT por EDA",
+    "aguarda_cirurgia_cardiaca": "Aguarda cirurgia cardíaca",
+    "manejo_clinico": "Manejo clínico",
+    "manejo_sintomatico": "Manejo sintomático",
+    "cuidados_paliativos": "Cuidados paliativos",
+    "cuidados_pos_operatorios": "Cuidados pós-operatórios",
+    "cuidados_fim_vida": "Cuidados de fim de vida",
+    "fragilidade_familiar": "Fragilidade familiar",
+    "vulnerabilidade_social": "Vulnerabilidade social",
+    "vulnerabilidade_socioeconomica": "Vulnerabilidade socioeconômica",
+    "vulnerabilidade_emocional": "Vulnerabilidade emocional",
+    "documento_identidade": "Documento de identidade",
+    "familia_nao_cooperativa": "Família não cooperativa",
+    "aguarda_padi_pmec": "Aguarda PADI/PMEC",
+    "aguarda_home_care": "Aguarda home care",
+    "aguarda_vaga_abrigo": "Aguarda vaga em abrigo",
+    "aguardando_documentacao": "Aguardando documentação",
+    "transporte_sanitario_eletivo": "Transporte sanitário eletivo",
+    "familiar_acompanhante_alta": "Familiar acompanhante para alta",
+    "aguarda_leito_cuidados_prolongados": "Aguarda leito cuidados prolongados",
+    "aguarda_regulacao_transferencia": "Aguarda regulação transferência",
+    "aguarda_regulacao_marcapasso": "Aguarda regulação marcapasso",
+}
+
+
+def _slugify(text: str) -> str:
+    value = re.sub(r"[^\w\s-]", "", text, flags=re.U).strip().lower()
+    return re.sub(r"[\s_-]+", "_", value)
+
+
+def write_pendencias_sql(path: Path, egaa_rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines: list[str] = [
+        "-- Inserção de pendências para alta gerada a partir da planilha do EGAA.",
+        "-- Não resolve pendências existentes; evita duplicatas por prontuario+codigo.",
+        "",
+    ]
+
+    pendencias = [r for r in egaa_rows if r.get("tipo_intervencao_nome") == "Pendência para alta"]
+    for row in pendencias:
+        pront = sql_quote(row.get("prontuario"))
+        label = clean_text(row.get("descricao") or row.get("titulo") or "")
+        codigo = None
+        # tenta mapear por rótulo exato
+        for k, v in PENDENCIA_ROTULOS.items():
+            if label.lower() == v.lower():
+                codigo = k
+                break
+        # tenta conter o rótulo
+        if codigo is None:
+            for k, v in PENDENCIA_ROTULOS.items():
+                if v.lower() in label.lower():
+                    codigo = k
+                    break
+        if codigo is None:
+            codigo = _slugify(label) or "pendencia_desconhecida"
+
+        lines.append(
+            "INSERT INTO egaa_pendencia_alta (prontuario, codigo, resolvida, created_at, updated_at)"
+        )
+        lines.append(
+            f"SELECT {pront}, '{codigo}', 0, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM egaa_pendencia_alta WHERE prontuario={pront} AND codigo='{codigo}');"
+        )
+        lines.append("")
+
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def write_evolucoes_sql(path: Path, egaa_rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines: list[str] = [
+        "-- Upsert de evoluções do EGAA gerado a partir da planilha.",
+        "-- Atualiza campo 'evolucao' para prontuários existentes ou insere novo registro.",
+        "",
+    ]
+
+    evolucoes = [r for r in egaa_rows if r.get("tipo_intervencao_nome") == "Evolução EGAA"]
+    for row in evolucoes:
+        pront = sql_quote(row.get("prontuario"))
+        evol_text = sql_quote(row.get("descricao") or row.get("titulo") or "")
+        lines.append(
+            "INSERT INTO egaa_evolucao_paciente (prontuario, evolucao, created_at, updated_at) VALUES"
+        )
+        lines.append(f"  ({pront}, {evol_text}, NOW(), NOW())")
+        lines.append("ON DUPLICATE KEY UPDATE evolucao=VALUES(evolucao), updated_at=VALUES(updated_at);")
+        lines.append("")
+
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def write_all_sql(output_dir: Path, egaa_rows: list[dict[str, Any]]) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    write_egaa_sql(output_dir / "intervencoes_egaa.sql", [r for r in egaa_rows if r.get("tipo_intervencao_nome") == "Intervenção EGAA"])
+    write_evolucoes_sql(output_dir / "evolucoes_egaa.sql", egaa_rows)
+    write_pendencias_sql(output_dir / "pendencias_egaa.sql", egaa_rows)
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) < 2:
+        print("Uso: python egga_carga_atual.py <caminho_csv> [snapshot_date:YYYY-MM-DD] [output_dir]")
+        raise SystemExit(1)
+
+    csv_path = Path(sys.argv[1])
+    snap = None
+    if len(sys.argv) >= 3:
+        try:
+            snap = datetime.strptime(sys.argv[2], "%Y-%m-%d").date()
+        except Exception:
+            print("Formato de data inválido. Use YYYY-MM-DD.")
+            raise
+    else:
+        snap = date.today()
+
+    out = Path(sys.argv[3]) if len(sys.argv) >= 4 else Path("./sql_output")
+
+    source_rows = load_source_rows(csv_path)
+    resultado = build_carga_atual(source_rows, snap)
+    write_all_sql(out, resultado.egaa_rows)
+    print(f"Arquivos SQL gerados em: {out.resolve()}")
+
