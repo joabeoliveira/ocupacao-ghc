@@ -1522,11 +1522,6 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
         carregarPendencias(prontuario);
       }} catch {{ }}
     }}
-      }} catch (err) {{
-        modalTitle.textContent = 'Erro ao carregar';
-        modalBody.innerHTML = '<div class="modal-loading" style="color:var(--error);">Não foi possível carregar os dados do paciente.</div>';
-      }}
-    }}
 
     function fecharModal() {{
       modalBackdrop.classList.remove('open');
