@@ -338,7 +338,7 @@ def dashboard_page() -> str:
         A pergunta principal desta tela é simples: <strong>como está a ocupação hoje?</strong>
         Use os filtros acima para refinar a leitura.
       </div>
-      <div class="sidebar-version">v{settings.app_version} · {settings.app_env}</div>
+      <div class="sidebar-version">v__APP_VERSION__ · __APP_ENV__</div>
     </aside>
     <main class="main">
       <div class="shell">
@@ -684,7 +684,7 @@ def root_redirect() -> RedirectResponse:
 
 @router.get("/dashboard", response_class=HTMLResponse)
 def dashboard_route() -> str:
-    return dashboard_page()
+    return dashboard_page().replace("__APP_VERSION__", settings.app_version).replace("__APP_ENV__", settings.app_env)
 
 
 def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = None) -> str:
@@ -1013,11 +1013,6 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
       background: rgba(0,0,0,0.04); color: var(--muted); font-size: 11px;
       text-align: center; letter-spacing: .02em;
     }}
-    .sidebar-version {{
-      margin-top: auto; padding: 10px 12px; border-radius: 10px;
-      background: rgba(0,0,0,0.04); color: var(--muted); font-size: 11px;
-      text-align: center; letter-spacing: .02em;
-    }}
 
     @media (max-width: 1100px) {{
       .layout {{ grid-template-columns: 1fr; }}
@@ -1025,11 +1020,6 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
       .filters-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
       .leitos-grid {{ grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }}
     }}
-      .sidebar-version {
-      margin-top: auto; padding: 10px 12px; border-radius: 10px;
-      background: rgba(0,0,0,0.04); color: var(--muted); font-size: 11px;
-      text-align: center; letter-spacing: .02em;
-    }
   </style>
 </head>
 <body>
@@ -2568,7 +2558,7 @@ def paciente_detail_route(prontuario: str) -> str:
 
 @router.get("/configuracoes", response_class=HTMLResponse)
 def configuracoes_route() -> str:
-    return """
+    html = """
 <!doctype html>
 <html lang="pt-BR">
 <head>
@@ -3098,3 +3088,4 @@ def configuracoes_route() -> str:
 </body>
 </html>
 """
+    return html.replace("{settings.app_version}", settings.app_version).replace("{settings.app_env}", settings.app_env)
