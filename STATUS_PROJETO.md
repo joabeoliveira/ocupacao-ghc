@@ -1,5 +1,5 @@
 # STATUS DO PROJETO - Ocupação NIR / EGAA
-Data: 2026-06-30
+Data: 2026-07-10
 
 ## Situação atual
 
@@ -110,9 +110,35 @@ A correção do censo diário foi implementada e validada no ambiente provisóri
 
    - Ou cole o SQL na aba SQL do phpMyAdmin.
 
+## Atualizações recentes (09-10/07)
+
+### 1. Carga de dados EGAA (evoluções, pendências e intervenções)
+
+- Gerados SQLs de carga a partir da planilha de controle `dados para bd egaa - dados_limpos.csv`:
+  - **74 evoluções** → tabela `egaa_evolucao_paciente` (upsert por prontuário)
+  - **73 pendências** → tabela `egaa_pendencia_alta` (split por vírgula, mapeamento para códigos padronizados, 30 pacientes)
+  - **80 intervenções** → tabela `egaa_intervencao_paciente` (a partir de CSV estruturado com dados de atuação)
+- Criados **17 novos tipos de intervenção** na `egaa_tipo_intervencao`:
+  - **11 ativos** (aparecem no dropdown em ordem alfabética): Acompanhamento do quadro clínico, Articulação com a rede, Articulação com especialistas, Discussão em round, Encaixe de exame, Entrevista social, Orientação educativa, Planejamento da alta, Solic. acompanhamento da fisioterapia, Solic. acompanhamento da T.O., Solic. acompanhamento do Serviço Social
+  - **6 inativos** (só histórico, não poluem o seletor): tipos muito específicos de agendamento/regulação
+- SQLs executados no phpMyAdmin com sucesso.
+
+### 2. Scripts auxiliares criados
+
+- `scripts/gerar_pendencias_sql.py` — geração de SQL de pendências com split por vírgula e mapeamento de códigos
+- `scripts/gerar_intervencoes_sql.py` — geração de SQL de intervenções a partir de CSV padronizado
+- `src/etl/egaa_evolucao_import.py` — script adicional para importação de evoluções
+- `src/etl/egaa_carga_atual.py` — estendido com funções `write_pendencias_sql`, `write_evolucoes_sql`, `write_all_sql` e dicionário `PENDENCIA_ROTULOS`
+
+### 3. Limpeza e versionamento
+
+- Commit e push realizados (`2b7f5e3` + `305a63d`)
+- Artefatos temporários (`tmp/`) removidos
+- `.vscode/` adicionado ao `.gitignore`
+
 ## Próximos passos específicos sugeridos
 
-- Executar o SQL no phpMyAdmin para popular `egaa_tipo_intervencao` (rápido e direto).
-- Rodar o seed localmente após garantir acesso ao banco (`$env:PYTHONPATH='backend' python scripts/seed_egaa_tipos.py`).
-- Validar dropdown `Tipo de intervenção` na página do paciente e confirmar que todas as opções aparecem.
+- Validar visualmente na página de detalhe do paciente se evoluções, pendências e intervenções estão sendo exibidas corretamente.
+- Validar dropdown `Tipo de intervenção` na página do paciente e confirmar que as 11 opções ativas aparecem em ordem alfabética.
+- Realizar deploy da versão mais recente no Easypanel para refletir os novos dados.
 

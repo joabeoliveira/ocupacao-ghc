@@ -878,10 +878,124 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
     .muted {{ color:var(--muted); }}
     .pagination {{ margin-top:12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }}
     .empty {{ padding: 16px 0; color: var(--muted); }}
+    /* ── Alternador de visualização ── */
+    .view-toggle {{
+      display:inline-flex; gap:4px; padding:4px; background:#edf2f7;
+      border-radius:10px; border:1px solid var(--panel-border);
+    }}
+    .view-toggle button {{
+      padding:6px 14px; border-radius:8px; border:none; cursor:pointer;
+      font-weight:600; font-size:13px; background:transparent; color:var(--muted);
+      transition: all .15s;
+    }}
+    .view-toggle button.active {{ background:#fff; color:var(--brand); box-shadow:0 2px 8px rgba(16,24,40,0.10); }}
+
+    /* ── Grid de leitos ── */
+    .leitos-grid {{
+      display:grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap:12px; margin-top: 4px;
+    }}
+    .leito-card {{
+      position:relative; background:var(--panel); border-radius:12px;
+      border:1px solid var(--panel-border); cursor:pointer;
+      padding:14px; transition: all .15s;
+      box-shadow:0 4px 12px rgba(16,24,40,0.04);
+      overflow:hidden;
+    }}
+    .leito-card:hover {{
+      box-shadow:0 8px 24px rgba(16,24,40,0.12); transform:translateY(-2px);
+      border-color:var(--brand);
+    }}
+    .leito-card .leito-label {{
+      font-size:11px; text-transform:uppercase; letter-spacing:.04em;
+      color:var(--muted); font-weight:700; margin-bottom:4px;
+    }}
+    .leito-card .leito-pront {{
+      font-size:12px; color:var(--brand); font-weight:700;
+    }}
+    .leito-card .leito-nome {{
+      font-size:14px; font-weight:700; color:var(--text);
+      margin:2px 0 6px; overflow:hidden; text-overflow:ellipsis;
+      white-space:nowrap;
+    }}
+    .leito-card .leito-meta {{
+      font-size:12px; color:var(--muted); line-height:1.4;
+    }}
+    .leito-card .leito-dias {{
+      font-size:20px; font-weight:800; line-height:1;
+    }}
+    .leito-card .priority-line {{
+      position:absolute; top:0; left:0; right:0; height:4px;
+    }}
+    .priority-laranja {{ --bar-bg: #F9A825; }}
+    .priority-vermelho {{ --bar-bg: #C62828; }}
+    .priority-escuro {{ --bar-bg: #7F1D1D; }}
+    .priority-laranja .priority-line {{ background: var(--bar-bg); }}
+    .priority-vermelho .priority-line {{ background: var(--bar-bg); }}
+    .priority-escuro .priority-line {{ background: var(--bar-bg); }}
+    .leito-card .leito-badge {{
+      display:inline-block; padding:2px 8px; border-radius:999px;
+      font-size:10px; font-weight:700; letter-spacing:.02em;
+      margin-top:4px;
+    }}
+    .leito-card .leito-badge.egaa-ativo {{
+      background: rgba(0, 167, 157, 0.12); color: var(--secondary);
+    }}
+    .leito-card .leito-badge.egaa-inativo {{
+      background: rgba(107, 114, 128, 0.10); color: var(--muted);
+    }}
+
+    /* ── Tooltip ── */
+    .leito-card .leito-tooltip {{
+      visibility:hidden; opacity:0; transition: opacity .2s;
+      position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%);
+      background:#1F2937; color:#fff; padding:12px 14px; border-radius:10px;
+      width:260px; font-size:13px; line-height:1.5; z-index:100;
+      box-shadow:0 8px 24px rgba(0,0,0,0.25); pointer-events:none;
+      text-align:left;
+    }}
+    .leito-card:hover .leito-tooltip {{
+      visibility:visible; opacity:1;
+    }}
+    .leito-tooltip::after {{
+      content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%);
+      border:6px solid transparent; border-top-color:#1F2937;
+    }}
+    .leito-tooltip strong {{ color:#fff; }}
+    .leito-tooltip .tt-muted {{ color:#B0BEC5; font-size:12px; }}
+
+    /* ── Modal ── */
+    .modal-backdrop {{
+      position:fixed; inset:0; background:rgba(0,0,0,0.45);
+      backdrop-filter:blur(4px); z-index:1000; display:none;
+      align-items:center; justify-content:center;
+    }}
+    .modal-backdrop.open {{ display:flex; }}
+    .modal-dialog {{
+      background:var(--panel); border-radius:16px; width:min(90vw, 860px);
+      max-height:90vh; overflow-y:auto; box-shadow:0 24px 64px rgba(16,24,40,0.2);
+      animation:modalIn .2s ease-out;
+    }}
+    @keyframes modalIn {{ from {{ opacity:0; transform:scale(.95) translateY(10px); }} to {{ opacity:1; transform:scale(1) translateY(0); }} }}
+    .modal-header {{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding:18px 20px; border-bottom:1px solid #edf2f7; position:sticky; top:0;
+      background:var(--panel); border-radius:16px 16px 0 0; z-index:1;
+    }}
+    .modal-header h2 {{ margin:0; font-size:18px; color:var(--brand-strong); }}
+    .modal-close {{
+      background:none; border:none; font-size:22px; cursor:pointer; color:var(--muted);
+      padding:4px 8px; border-radius:8px;
+    }}
+    .modal-close:hover {{ background:#edf2f7; color:var(--text); }}
+    .modal-body {{ padding:20px; }}
+    .modal-loading {{ text-align:center; padding:40px; color:var(--muted); }}
+
     @media (max-width: 1100px) {{
       .layout {{ grid-template-columns: 1fr; }}
       .sidebar {{ position: static; height: auto; border-right: none; border-bottom: 1px solid var(--panel-border); }}
       .filters-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+      .leitos-grid {{ grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }}
     }}
   </style>
 </head>
@@ -965,9 +1079,14 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
               <h2>Registros</h2>
               <p id="pageInfo" class="muted">Página 1</p>
             </div>
+            <div class="view-toggle" id="viewToggle" style="display:{'flex' if default_min_dias is not None else 'none'}">
+              <button type="button" id="viewTableBtn" class="active">📋 Tabela</button>
+              <button type="button" id="viewGridBtn">🛏️ Leitos</button>
+            </div>
           </div>
           <div class="section-body">
-            <table aria-live="polite">
+            <div class="leitos-grid" id="leitosGrid" style="display:none;"></div>
+            <table aria-live="polite" id="pacientesTable">
               <thead>
                 <tr><th>Prontuario</th><th>Nome</th><th>Idade</th><th>Dias</th><th>Especialidade</th><th>Unidade</th>{egaa_column_header_html}</tr>
               </thead>
@@ -1013,34 +1132,197 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
         </section>
       </div>
     </main>
+  <!-- ── Modal de detalhe do paciente ── -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-header">
+        <h2 id="modalTitle">Carregando paciente...</h2>
+        <button type="button" class="modal-close" id="modalClose" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <div class="modal-loading">Carregando dados do paciente...</div>
+      </div>
+    </div>
   </div>
-  <script>
-    const API_PREFIX = '/api';
-    const isLongaPermanencia = {str(default_min_dias is not None).lower()};
-    const diasMinimos = {('null' if default_min_dias is None else default_min_dias)};
-    const kpisEl = document.getElementById('kpis');
-    const rowsEl = document.getElementById('rows');
-    const prontuarioEl = document.getElementById('prontuario');
-    const nomeEl = document.getElementById('nome');
-    const especialidadeEl = document.getElementById('especialidade');
-    const unidadeEl = document.getElementById('unidade');
-    const dataInicioEl = document.getElementById('dataInicio');
-    const dataFimEl = document.getElementById('dataFim');
-    const minDiasEl = document.getElementById('minDias');
-    const prioridadeEl = document.getElementById('prioridade');
-    const filtrarBtn = document.getElementById('filtrar');
-    const prevBtn = document.getElementById('prev');
-    const nextBtn = document.getElementById('next');
-    const pageInfo = document.getElementById('pageInfo');
-    const histProntuarioEl = document.getElementById('histProntuario');
-    const histTipoEl = document.getElementById('histTipo');
-    const histBuscarBtn = document.getElementById('histBuscar');
-    const histRowsEl = document.getElementById('histRows');
-    const histResumoEl = document.getElementById('histResumo');
-    let page = 1;
-    let pageSize = parseInt(document.getElementById('pageSizeSelect').value, 10) || 10;
-    let histTiposMap = {{}};
 
+  <script>
+    // ── Variáveis globais ──
+    const API_PREFIX = '/api';
+    const IS_LONGA = {str(default_min_dias is not None).lower()};
+    let pagina = 1;
+    let tamanhoPagina = parseInt(document.getElementById('pageSizeSelect').value, 10) || 10;
+    let viewAtual = 'tabela'; // 'tabela' | 'leitos'
+    let ultimosItems = [];
+
+    // ── Alternância de visualização ──
+    const viewToggle = document.getElementById('viewToggle');
+    const viewTableBtn = document.getElementById('viewTableBtn');
+    const viewGridBtn = document.getElementById('viewGridBtn');
+    const pacientesTable = document.getElementById('pacientesTable');
+    const leitosGrid = document.getElementById('leitosGrid');
+
+    if (viewTableBtn && viewGridBtn) {{
+      viewTableBtn.addEventListener('click', () => {{
+        viewAtual = 'tabela';
+        viewTableBtn.classList.add('active');
+        viewGridBtn.classList.remove('active');
+        pacientesTable.style.display = '';
+        leitosGrid.style.display = 'none';
+      }});
+      viewGridBtn.addEventListener('click', () => {{
+        viewAtual = 'leitos';
+        viewGridBtn.classList.add('active');
+        viewTableBtn.classList.remove('active');
+        pacientesTable.style.display = 'none';
+        leitosGrid.style.display = '';
+        renderLeitosGrid(ultimosItems);
+      }});
+    }}
+
+    // ── Renderizar grid de leitos ──
+    function renderLeitosGrid(items) {{
+      if (!items.length) {{
+        leitosGrid.innerHTML = '<div class="muted" style="grid-column:1/-1;text-align:center;padding:32px;">Nenhum paciente encontrado com os filtros atuais.</div>';
+        return;
+      }}
+      leitosGrid.innerHTML = items.map(item => {{
+        const dias = Number(item.dias_internacao || 0);
+        const idade = Number(item.idade_anos || 0);
+        const egaaTotal = Number(item.egaa_total_atuacoes || 0);
+        let prioridadeClass = 'priority-laranja';
+        let badgeLabel = '15-29 dias';
+        if (dias >= 30 && idade >= 60) {{ prioridadeClass = 'priority-escuro'; badgeLabel = '30+ dias · 60+ anos'; }}
+        else if (dias >= 30) {{ prioridadeClass = 'priority-vermelho'; badgeLabel = '30+ dias'; }}
+        const egaaBadge = egaaTotal > 0
+          ? `<span class="leito-badge egaa-ativo">${{egaaTotal}} atuações</span>`
+          : `<span class="leito-badge egaa-inativo">Sem EGAA</span>`;
+        const pront = escapeHtml(item.prontuario || '');
+        const nome = escapeHtml(item.nome_paciente || '');
+        const unidade = escapeHtml(item.unidade || '--');
+        const leito = escapeHtml(item.leito || '--');
+        const especialidade = escapeHtml(item.especialidade || '--');
+        const cid = escapeHtml(item.cid_internacao_descricao || '');
+        const ultAtuacao = item.egaa_ultima_atuacao
+          ? new Intl.DateTimeFormat('pt-BR').format(new Date(item.egaa_ultima_atuacao)) : '--';
+        return `
+          <div class="leito-card ${{prioridadeClass}}" data-prontuario="${{pront}}"
+               onclick="abrirModal('${{pront}}')">
+            <div class="priority-line"></div>
+            <div class="leito-label">Leito ${{leito}}</div>
+            <div class="leito-pront">#${{pront}}</div>
+            <div class="leito-nome" title="${{nome}}">${{nome}}</div>
+            <div class="leito-meta"><span class="leito-dias">${{dias}}</span> dias · ${{idade}}a</div>
+            <div class="leito-meta">${{unidade}} · ${{especialidade}}</div>
+            ${{egaaBadge}}
+
+            <!-- Tooltip -->
+            <div class="leito-tooltip">
+              <strong>${{nome}}</strong><br>
+              <span class="tt-muted">#${{pront}} · ${{idade}} anos · ${{dias}} dias internado</span><br>
+              <span class="tt-muted">${{unidade}} · Leito ${{leito}} · ${{especialidade}}</span>
+              <hr style="border:none;border-top:1px solid rgba(255,255,255,0.15);margin:8px 0;">
+              <span class="tt-muted">CID: ${{cid || '--'}}</span><br>
+              <span class="tt-muted">EGAA: ${{egaaTotal}} atuação(ões) · Última: ${{ultAtuacao}}</span>
+              <span class="tt-muted" style="display:block;margin-top:6px;font-style:italic;">Clique para detalhes completos</span>
+            </div>
+          </div>`;
+      }}).join('');
+    }}
+
+    // ── Modal ──
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    const modalBody = document.getElementById('modalBody');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalClose = document.getElementById('modalClose');
+
+    async function abrirModal(prontuario) {{
+      modalBackdrop.classList.add('open');
+      modalTitle.textContent = 'Carregando paciente...';
+      modalBody.innerHTML = '<div class="modal-loading">Carregando dados do paciente...</div>';
+      try {{
+        const res = await fetch(`${{API_PREFIX}}/censo/paciente/${{encodeURIComponent(prontuario)}}`);
+        if (!res.ok) throw new Error('Erro ' + res.status);
+        const data = await res.json();
+        modalTitle.textContent = (data.nome_paciente || 'Paciente') + ' #' + (data.prontuario || '');
+        const evolucao = escapeHtml(data.evolucao || '');
+        const nome = escapeHtml(data.nome_paciente || '--');
+        const especialidade = escapeHtml(data.especialidade || '--');
+        const unidade = escapeHtml(data.unidade || '--');
+        const enfermaria = escapeHtml(data.enfermaria || '--');
+        const leito = escapeHtml(data.leito || '--');
+        const cidCod = escapeHtml(data.cid_internacao_codigo || '--');
+        const cidDesc = escapeHtml(data.cid_internacao_descricao || '');
+        const dataInternacao = data.data_internacao ? new Intl.DateTimeFormat('pt-BR').format(new Date(data.data_internacao)) : '--';
+        const egaaTotal = data.egaa_total_atuacoes || 0;
+        const egaaUltima = data.egaa_ultima_atuacao ? new Intl.DateTimeFormat('pt-BR').format(new Date(data.egaa_ultima_atuacao)) : '--';
+
+        modalBody.innerHTML = `
+          <div class="cards" style="margin-top:0;">
+            <div class="card"><strong>Prontuário</strong><div class="kpi-value" style="font-size:22px;">#${{data.prontuario}}</div></div>
+            <div class="card"><strong>Dias internado</strong><div class="kpi-value" style="font-size:22px;">${{data.dias_internacao ?? '--'}}</div></div>
+            <div class="card"><strong>Idade</strong><div class="kpi-value" style="font-size:22px;">${{data.idade_anos ?? '--'}} anos</div></div>
+            <div class="card"><strong>EGAA</strong><div class="kpi-value" style="font-size:18px;line-height:1.3;">${{egaaTotal}} atuações<br><span style="font-size:13px;font-weight:400;">Última: ${{egaaUltima}}</span></div></div>
+          </div>
+          <div class="grid" style="margin-top:12px;grid-template-columns:1.2fr 1fr;">
+            <div class="section">
+              <div class="section-header"><h2 style="font-size:14px;">Resumo clínico</h2></div>
+              <div class="section-body" style="padding:12px 16px;">
+                <div class="muted" style="font-size:13px;line-height:1.6;">
+                  <strong>Nome:</strong> ${{nome}}<br>
+                  <strong>Especialidade:</strong> ${{especialidade}}<br>
+                  <strong>Unidade:</strong> ${{unidade}} · <strong>Enfermaria:</strong> ${{enfermaria}}<br>
+                  <strong>Leito:</strong> ${{leito}}<br>
+                  <strong>CID:</strong> ${{cidCod}} ${{cidDesc ? '- ' + cidDesc : ''}}<br>
+                  <strong>Internação:</strong> ${{dataInternacao}}
+                </div>
+              </div>
+            </div>
+            <div class="section">
+              <div class="section-header"><h2 style="font-size:14px;">Evolução EGAA</h2></div>
+              <div class="section-body" style="padding:12px 16px;">
+                <div style="font-size:13px;line-height:1.6;white-space:pre-wrap;max-height:180px;overflow-y:auto;">${{evolucao || '<span class="muted">Nenhuma evolução registrada.</span>'}}</div>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:14px;text-align:center;">
+            <a href="/paciente/${{encodeURIComponent(data.prontuario)}}" class="pill-link" style="display:inline-flex;">Abrir página completa do paciente →</a>
+          </div>`;
+      }} catch (err) {{
+        modalTitle.textContent = 'Erro ao carregar';
+        modalBody.innerHTML = '<div class="modal-loading" style="color:var(--error);">Não foi possível carregar os dados do paciente.</div>';
+      }}
+    }}
+
+    function fecharModal() {{
+      modalBackdrop.classList.remove('open');
+    }}
+
+    if (modalClose) modalClose.addEventListener('click', fecharModal);
+    if (modalBackdrop) modalBackdrop.addEventListener('click', (e) => {{
+      if (e.target === modalBackdrop) fecharModal();
+    }});
+    document.addEventListener('keydown', (e) => {{
+      if (e.key === 'Escape') fecharModal();
+    }});
+
+    // ── Utilitários ──
+    function escapeHtml(text) {{
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }}
+
+    function fmtDate(value) {{
+      if (!value) return '--';
+      try {{
+        return new Intl.DateTimeFormat('pt-BR').format(new Date(value));
+      }} catch {{
+        return String(value);
+      }}
+    }}
+
+    // ── Função priorityMeta (já existia, mantida) ──
     function priorityMeta(item) {{
       const dias = Number(item.dias_internacao || 0);
       const idade = Number(item.idade_anos || 0);
@@ -1050,17 +1332,26 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
       return {{ label: 'Acompanhamento', css: '' }};
     }}
 
+    // ── Load pacientes (adaptado) ──
     async function loadPacientes() {{
       const params = new URLSearchParams();
-      params.set('page', page);
-      params.set('page_size', pageSize);
-      if (prontuarioEl.value) params.set('prontuario', prontuarioEl.value);
-      if (nomeEl.value) params.set('nome', nomeEl.value);
-      if (especialidadeEl.value) params.set('especialidade', especialidadeEl.value);
-      if (unidadeEl.value) params.set('unidade', unidadeEl.value);
-      if (dataInicioEl.value) params.set('data_inicio', dataInicioEl.value);
-      if (dataFimEl.value) params.set('data_fim', dataFimEl.value);
-      if (minDiasEl.value) params.set('min_dias', minDiasEl.value);
+      params.set('page', pagina);
+      params.set('page_size', tamanhoPagina);
+      const prontuarioEl = document.getElementById('prontuario');
+      const nomeEl = document.getElementById('nome');
+      const especialidadeEl = document.getElementById('especialidade');
+      const unidadeEl = document.getElementById('unidade');
+      const dataInicioEl = document.getElementById('dataInicio');
+      const dataFimEl = document.getElementById('dataFim');
+      const minDiasEl = document.getElementById('minDias');
+      const prioridadeEl = document.getElementById('prioridade');
+      if (prontuarioEl && prontuarioEl.value) params.set('prontuario', prontuarioEl.value);
+      if (nomeEl && nomeEl.value) params.set('nome', nomeEl.value);
+      if (especialidadeEl && especialidadeEl.value) params.set('especialidade', especialidadeEl.value);
+      if (unidadeEl && unidadeEl.value) params.set('unidade', unidadeEl.value);
+      if (dataInicioEl && dataInicioEl.value) params.set('data_inicio', dataInicioEl.value);
+      if (dataFimEl && dataFimEl.value) params.set('data_fim', dataFimEl.value);
+      if (minDiasEl && minDiasEl.value) params.set('min_dias', minDiasEl.value);
       if (prioridadeEl && prioridadeEl.value === '15') params.set('min_dias', '15');
       if (prioridadeEl && prioridadeEl.value === '30') params.set('min_dias', '30');
       if (prioridadeEl && prioridadeEl.value === '60') {{
@@ -1074,142 +1365,91 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
 
       const res = await fetch(`${{API_PREFIX}}/censo/pacientes?` + params.toString());
       if (!res.ok) {{
-        rowsEl.innerHTML = `<tr><td colspan="6">Erro ao obter registros (${{res.status}})</td></tr>`;
+        document.getElementById('rows').innerHTML = '<tr><td colspan="' + (IS_LONGA ? '7' : '6') + '">Erro ao obter registros (' + res.status + ')</td></tr>';
         return;
       }}
       const data = await res.json();
       const items = Array.isArray(data.items) ? data.items : [];
+      ultimosItems = items;
+
+      // Atualiza KPIs
+      document.getElementById('kpis').innerHTML = IS_LONGA
+        ? renderLongaKPIs(data)
+        : renderGeralKPIs(data);
+
+      // Renderiza tabela
+      renderTabela(items, data);
+
+      // Se estiver na visualização de leitos, renderiza grid
+      if (viewAtual === 'leitos') renderLeitosGrid(items);
+
+      // Paginação
+      document.getElementById('pageInfo').textContent = 'Página ' + data.page + ' de ' + (Math.ceil(data.total / data.page_size) || 1);
+      document.getElementById('prev').disabled = data.page <= 1;
+      document.getElementById('next').disabled = data.page * data.page_size >= data.total;
+    }}
+
+    function renderLongaKPIs(data) {{
+      const items = data.items || [];
       const diasMaximos = items.reduce((max, item) => Math.max(max, Number(item.dias_internacao || 0)), 0);
-      const mediaDias = items.length
-        ? Math.round(items.reduce((sum, item) => sum + Number(item.dias_internacao || 0), 0) / items.length)
-        : 0;
-      const unidadeLider = items.reduce((acc, item) => {{
-        const unidade = item.unidade || '--';
-        acc[unidade] = (acc[unidade] || 0) + 1;
-        return acc;
-      }}, {{}});
+      const mediaDias = items.length ? Math.round(items.reduce((sum, item) => sum + Number(item.dias_internacao || 0), 0) / items.length) : 0;
+      const unidadeLider = items.reduce((acc, item) => {{ acc[item.unidade || '--'] = (acc[item.unidade || '--'] || 0) + 1; return acc; }}, {{}});
       const unidadeLiderNome = Object.entries(unidadeLider).sort((a, b) => b[1] - a[1])[0]?.[0] || '--';
       const unidadeLiderTotal = Object.entries(unidadeLider).sort((a, b) => b[1] - a[1])[0]?.[1] || 0;
-      const egaaAtivos = items.filter(item => Number(item.egaa_total_atuacoes || 0) > 0).length;
-      const egaaAtuacoesTotal = items.reduce((acc, item) => acc + Number(item.egaa_total_atuacoes || 0), 0);
-      const egaaUltimaAtuacao = items.reduce((acc, item) => {{
-        const atual = item.egaa_ultima_atuacao || '';
-        return atual && (!acc || String(atual) > String(acc)) ? atual : acc;
-      }}, '');
-      if (isLongaPermanencia) {{
-        const kpiParams = new URLSearchParams();
-        if (dataInicioEl.value) kpiParams.set('data_inicio', dataInicioEl.value);
-        if (dataFimEl.value) kpiParams.set('data_fim', dataFimEl.value);
+      return `
+        <div class="card"><span class="badge badge-info">Lista atual</span><strong>Total encontrado</strong><div class="kpi-value">${{data.total}}</div></div>
+        <div class="card"><span class="badge badge-warning">Máximo</span><strong>Maior permanência</strong><div class="kpi-value">${{diasMaximos}} dias</div></div>
+        <div class="card"><span class="badge badge-secondary">Média</span><strong>Média de dias</strong><div class="kpi-value">${{mediaDias}} dias</div></div>
+        <div class="card"><span class="badge badge-info">Concentração</span><strong>${{unidadeLiderNome}}</strong><div class="kpi-value">${{unidadeLiderTotal}} pacientes</div></div>
+      `;
+    }}
 
-        const kpiRes = await fetch(`${{API_PREFIX}}/censo/kpis${{kpiParams.toString() ? `?${{kpiParams.toString()}}` : ''}}`);
-        if (kpiRes.ok) {{
-          const k = await kpiRes.json();
-          kpisEl.innerHTML = `
-            <div class="card"><span class="badge badge-info">Internação</span><strong>Total de pacientes internados</strong><div class="kpi-value">${{k.total_internados}}</div></div>
-            <div class="card"><span class="badge badge-warning">Longa</span><strong>Pacientes com permanência >= 15 dias</strong><div class="kpi-value">${{k.longa_permanencia_15}}</div></div>
-            <div class="card"><span class="badge badge-error">Longa</span><strong>Pacientes com permanência >= 30 dias</strong><div class="kpi-value">${{k.longa_permanencia_30}}</div></div>
-            <div class="card"><span class="badge badge-secondary">Idade</span><strong>Pacientes >= 60 anos</strong><div class="kpi-value">${{k.longa_permanencia_60_anos}}</div></div>
-            <div class="card"><span class="badge badge-secondary">Idade + Longa</span><strong>Pacientes >= 60 anos com permanência >= 15 dias</strong><div class="kpi-value">${{k.longa_permanencia_60_15}}</div></div>
-            <div class="card"><span class="badge badge-secondary">Idade + Longa</span><strong>Pacientes >= 60 anos com permanência >= 30 dias</strong><div class="kpi-value">${{k.longa_permanencia_60_30}}</div></div>
-          `;
-        }} else {{
-          kpisEl.innerHTML = '<div class="card">Erro ao obter KPIs de longa permanência</div>';
-        }}
-      }} else {{
-        kpisEl.innerHTML = `
-          <div class="card"><span class="badge {badge_class}">{badge_text}</span><strong>Total encontrado</strong><div class="kpi-value">${{data.total}}</div></div>
-          <div class="card"><span class="badge badge-info">Página atual</span><strong>Paginação</strong><div class="kpi-value">${{data.page}}</div></div>
-          <div class="card"><span class="badge badge-secondary">Lote visual</span><strong>Itens por página</strong><div class="kpi-value">${{data.page_size}}</div></div>
-        `;
-      }}
+    function renderGeralKPIs(data) {{
+      return `
+        <div class="card"><span class="badge {badge_class}">{badge_text}</span><strong>Total encontrado</strong><div class="kpi-value">${{data.total}}</div></div>
+        <div class="card"><span class="badge badge-info">Página atual</span><strong>Paginação</strong><div class="kpi-value">${{data.page}}</div></div>
+        <div class="card"><span class="badge badge-secondary">Lote visual</span><strong>Itens por página</strong><div class="kpi-value">${{data.page_size}}</div></div>
+      `;
+    }}
+
+    function renderTabela(items, data) {{
+      const rowsEl = document.getElementById('rows');
+      const isLonga = IS_LONGA;
       rowsEl.innerHTML = items.length
         ? items.map(it => {{
             const meta = priorityMeta(it);
             const egaaTotal = Number(it.egaa_total_atuacoes || 0);
             const egaaBadgeLabel = egaaTotal > 0 ? `${{egaaTotal}} atuação(ões)` : 'Sem EGAA';
             const egaaBadgeDetail = egaaTotal > 0
-              ? `Última: ${{it.egaa_ultima_atuacao ? new Intl.DateTimeFormat('pt-BR').format(new Date(it.egaa_ultima_atuacao)) : '--'}}`
+              ? 'Última: ' + fmtDate(it.egaa_ultima_atuacao)
               : 'Ainda sem registros do EGAA';
-            return `<tr class="${{meta.css}}">
-              <td><div class="badges"><span class="badge badge-info">${{meta.label}}</span></div><div style="margin-top:6px"><a href="/paciente/${{encodeURIComponent(it.prontuario)}}">${{it.prontuario}}</a></div></td>
-              <td>${{it.nome_paciente||''}}</td>
-              <td>${{it.idade_anos??''}}</td>
-              <td>${{it.dias_internacao??''}}</td>
-              <td>${{it.especialidade}}</td>
-              <td>${{it.unidade||''}}</td>
-              ${{isLongaPermanencia ? `
-              <td>
-                <div class="badges">
-                  <span class="badge badge-secondary">${{egaaBadgeLabel}}</span>
-                </div>
-                <div class="muted" style="margin-top:6px">${{egaaBadgeDetail}}</div>
-              </td>` : ''}}
-            </tr>`;
+            return '<tr class="' + meta.css + '">' +
+              '<td><div class="badges"><span class="badge badge-info">' + meta.label + '</span></div><div style="margin-top:6px"><a href="/paciente/' + encodeURIComponent(it.prontuario) + '">' + escapeHtml(it.prontuario) + '</a></div></td>' +
+              '<td>' + escapeHtml(it.nome_paciente||'') + '</td>' +
+              '<td>' + (it.idade_anos??'') + '</td>' +
+              '<td>' + (it.dias_internacao??'') + '</td>' +
+              '<td>' + escapeHtml(it.especialidade) + '</td>' +
+              '<td>' + escapeHtml(it.unidade||'') + '</td>' +
+              (isLonga ? '<td><div class="badges"><span class="badge badge-secondary">' + egaaBadgeLabel + '</span></div><div class="muted" style="margin-top:6px">' + egaaBadgeDetail + '</div></td>' : '') +
+              '</tr>';
           }}).join('')
-        : '<tr><td colspan="' + (isLongaPermanencia ? '7' : '6') + '" class="empty">Nenhum registro encontrado com os filtros atuais.</td></tr>';
-      pageInfo.textContent = `Página ${{data.page}} de ${{Math.ceil(data.total / data.page_size) || 1}}`;
-      prevBtn.disabled = data.page <= 1;
-      nextBtn.disabled = data.page * data.page_size >= data.total;
+        : '<tr><td colspan="' + (isLonga ? '7' : '6') + '" class="empty">Nenhum registro encontrado com os filtros atuais.</td></tr>';
     }}
 
-    async function loadHistoricoEGAA() {{
-      const prontuario = histProntuarioEl.value.trim();
-      if (!prontuario) {{
-        histResumoEl.textContent = 'Informe um prontuário para consultar as atuações do EGAA.';
-        histRowsEl.innerHTML = '<div class="muted">Nenhuma consulta realizada.</div>';
-        return;
-      }}
-      const params = new URLSearchParams();
-      params.set('prontuario', prontuario);
-      if (histTipoEl.value) params.set('tipo_intervencao_id', histTipoEl.value);
-      const res = await fetch(`${{API_PREFIX}}/egaa/intervencoes?` + params.toString());
-      if (!res.ok) {{
-        histResumoEl.textContent = 'Não foi possível carregar o histórico.';
-        histRowsEl.innerHTML = '<div class="muted">Erro ao consultar intervenções.</div>';
-        return;
-      }}
-      const data = await res.json();
-      const items = Array.isArray(data) ? data : [];
-      histResumoEl.textContent = items.length
-        ? `Foram encontradas ${{items.length}} atuações para o prontuário ${{prontuario}}.`
-        : `Nenhuma atuação do EGAA encontrada para o prontuário ${{prontuario}}.`;
-      histRowsEl.innerHTML = items.length
-        ? items.slice(0, 8).map(item => `
-              <div class="card" style="padding:12px 14px;">
-              <strong style="display:block; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em;">${{item.status || 'sem status'}}</strong>
-              <div style="font-weight:700; color:var(--brand-strong);">${{item.titulo || '--'}}</div>
-              <div class="muted" style="margin-top:4px;">Tipo: ${{histTiposMap[item.tipo_intervencao_id] || item.tipo_intervencao_id || '--'}} · Responsável: ${{item.usuario_responsavel || '--'}}</div>
-              <div class="muted" style="margin-top:4px;">Atuação em ${{fmtDate(item.data_atuacao)}} · Atualizado em ${{fmtDate(item.updated_at || item.created_at)}}</div>
-            </div>`).join('')
-        : '<div class="muted">Nenhuma intervenção registrada para este prontuário.</div>';
-    }}
-
-    filtrarBtn.addEventListener('click', () => {{ page = 1; pageSize = parseInt(document.getElementById('pageSizeSelect').value, 10) || 10; loadPacientes(); }});
-    prevBtn.addEventListener('click', () => {{ if (page > 1) page--; loadPacientes(); }});
-    nextBtn.addEventListener('click', () => {{ page++; loadPacientes(); }});
-    document.getElementById('pageSizeSelect').addEventListener('change', () => {{ page = 1; pageSize = parseInt(document.getElementById('pageSizeSelect').value, 10) || 10; loadPacientes(); }});
-    dataInicioEl.addEventListener('change', () => {{ page = 1; loadPacientes(); }});
-    dataFimEl.addEventListener('change', () => {{ page = 1; loadPacientes(); }});
-    minDiasEl.addEventListener('change', () => {{ page = 1; loadPacientes(); }});
-    if (prioridadeEl) prioridadeEl.addEventListener('change', () => {{ page = 1; loadPacientes(); }});
+    // ── Event listeners ──
+    document.getElementById('filtrar').addEventListener('click', () => {{ pagina = 1; tamanhoPagina = parseInt(document.getElementById('pageSizeSelect').value, 10) || 10; loadPacientes(); }});
+    document.getElementById('prev').addEventListener('click', () => {{ if (pagina > 1) pagina--; loadPacientes(); }});
+    document.getElementById('next').addEventListener('click', () => {{ pagina++; loadPacientes(); }});
+    document.getElementById('pageSizeSelect').addEventListener('change', () => {{ pagina = 1; tamanhoPagina = parseInt(document.getElementById('pageSizeSelect').value, 10) || 10; loadPacientes(); }});
+    document.getElementById('dataInicio').addEventListener('change', () => {{ pagina = 1; loadPacientes(); }});
+    document.getElementById('dataFim').addEventListener('change', () => {{ pagina = 1; loadPacientes(); }});
+    document.getElementById('minDias').addEventListener('change', () => {{ pagina = 1; loadPacientes(); }});
+    const prioridadeEl = document.getElementById('prioridade');
+    if (prioridadeEl) prioridadeEl.addEventListener('change', () => {{ pagina = 1; loadPacientes(); }});
     document.getElementById('refresh').addEventListener('click', () => {{ loadPacientes(); }});
-    histBuscarBtn.addEventListener('click', () => loadHistoricoEGAA());
-    histProntuarioEl.addEventListener('keydown', (event) => {{ if (event.key === 'Enter') loadHistoricoEGAA(); }});
 
+    // ── Inicializa ──
     loadPacientes();
-    if (histTipoEl) {{
-      fetch(`${{API_PREFIX}}/egaa/tipos-intervencao`)
-        .then(res => res.ok ? res.json() : [])
-        .then(items => {{
-          const list = Array.isArray(items) ? items : [];
-          histTiposMap = list.reduce((acc, item) => {{
-            acc[item.id] = item.nome || item.id;
-            return acc;
-          }}, {{}});
-          histTipoEl.innerHTML = ['<option value="">Todos</option>'].concat(list.map(item => `<option value="${{item.id}}">${{item.nome || '--'}}</option>`)).join('');
-        }})
-        .catch(() => {{}});
-    }}
   </script>
 </body>
 </html>
