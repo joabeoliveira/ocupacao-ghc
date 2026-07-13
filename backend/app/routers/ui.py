@@ -1305,6 +1305,25 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
                     <label>Descrição</label>
                     <textarea id="modalDescricao" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #cfd8e3;min-height:80px;font:inherit;resize:vertical;"></textarea>
                   </div>
+                  <div class="row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                    <div class="field" style="margin-bottom:0;">
+                      <label>Responsável</label>
+                      <input id="modalResponsavel" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #cfd8e3;box-sizing:border-box;" placeholder="ex: ENF EDUARDO" />
+                    </div>
+                    <div class="field" style="margin-bottom:0;">
+                      <label>Data da atuação</label>
+                      <input id="modalDataAtuacao" type="date" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #cfd8e3;box-sizing:border-box;" />
+                    </div>
+                  </div>
+                  <div class="field" style="margin-bottom:10px;">
+                    <label>Status</label>
+                    <select id="modalStatusIntervencao" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #cfd8e3;">
+                      <option value="aberta">Aberta</option>
+                      <option value="em_andamento">Em andamento</option>
+                      <option value="concluida">Concluída</option>
+                      <option value="cancelada">Cancelada</option>
+                    </select>
+                  </div>
                   <button type="button" id="modalSalvarAtuacao" style="width:100%;">Adicionar atuação</button>
                   <span id="modalAtuacaoStatus" class="muted" style="font-size:13px;display:block;margin-top:6px;"></span>
                 </div>
@@ -1458,6 +1477,9 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
     async function salvarAtuacao(prontuario) {{
       const tipoId = document.getElementById('modalTipoIntervencao').value;
       const descricao = document.getElementById('modalDescricao').value.trim();
+      const responsavel = document.getElementById('modalResponsavel').value.trim();
+      const dataAtuacao = document.getElementById('modalDataAtuacao').value || new Date().toISOString().split('T')[0];
+      const status = document.getElementById('modalStatusIntervencao').value;
       const statusEl = document.getElementById('modalAtuacaoStatus');
       if (!tipoId) {{ statusEl.textContent = 'Selecione um tipo de intervenção.'; return; }}
       if (!descricao) {{ statusEl.textContent = 'Descreva a intervenção.'; return; }}
@@ -1466,12 +1488,15 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
         const res = await fetch(`${{API_PREFIX}}/egaa/intervencoes`, {{
           method: 'POST',
           headers: {{ 'Content-Type': 'application/json' }},
-          body: JSON.stringify({{ prontuario, tipo_intervencao_id: parseInt(tipoId), titulo: modalTipos.find(t=>t.id==tipoId)?.nome || '', descricao, status: 'aberta', data_atuacao: new Date().toISOString().split('T')[0] }})
+          body: JSON.stringify({{ prontuario, tipo_intervencao_id: parseInt(tipoId), titulo: modalTipos.find(t=>t.id==tipoId)?.nome || '', descricao, status, usuario_responsavel: responsavel || null, data_atuacao: dataAtuacao }})
         }});
         if (!res.ok) throw new Error('Erro ' + res.status);
         statusEl.textContent = '✅ Atuação salva!';
         document.getElementById('modalDescricao').value = '';
         document.getElementById('modalTipoIntervencao').value = '';
+        document.getElementById('modalResponsavel').value = '';
+        document.getElementById('modalDataAtuacao').value = '';
+        document.getElementById('modalStatusIntervencao').value = 'aberta';
         carregarTimeline(prontuario);
       }} catch {{ statusEl.textContent = '❌ Erro ao salvar atuação.'; }}
     }}
