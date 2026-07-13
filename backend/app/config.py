@@ -19,6 +19,7 @@ def _split_csv(value: str | None, default: list[str]) -> list[str]:
 @dataclass(slots=True)
 class Settings:
     app_name: str = field(default_factory=lambda: os.getenv("APP_NAME", "EGAA API"))
+    app_version: str = field(default_factory=lambda: os.getenv("APP_VERSION", "1.1.0-leitos-grid"))
     app_env: str = field(default_factory=lambda: os.getenv("APP_ENV", "development"))
     api_prefix: str = field(default_factory=lambda: os.getenv("API_PREFIX", "/api"))
     mysql_user: str = field(default_factory=lambda: os.getenv("MYSQL_USER", ""))

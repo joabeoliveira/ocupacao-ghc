@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse, RedirectResponse
+from app.config import settings
 
 
 router = APIRouter(tags=["UI"])
@@ -161,6 +162,8 @@ def dashboard_page() -> str:
       top: 0;
       height: 100vh;
       box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
     }
     .brand { font-size: 18px; font-weight: 700; color: var(--brand-strong); margin: 0; }
     .brand-subtitle { margin: 6px 0 18px; color: var(--muted); font-size: 13px; }
@@ -306,13 +309,23 @@ def dashboard_page() -> str:
       .chart-row { grid-template-columns: 1fr; }
       .chart-value { text-align:left; }
     }
+    .sidebar-version {
+      margin-top: auto; padding: 10px 12px; border-radius: 10px;
+      background: rgba(0,0,0,0.04); color: var(--muted); font-size: 11px;
+      text-align: center; letter-spacing: .02em;
+    }
+      .sidebar-version {
+      margin-top: auto; padding: 10px 12px; border-radius: 10px;
+      background: rgba(0,0,0,0.04); color: var(--muted); font-size: 11px;
+      text-align: center; letter-spacing: .02em;
+    }
   </style>
 </head>
 <body>
   <div class="layout">
     <aside class="sidebar">
       <p class="brand">EGAA</p>
-      <p class="brand-subtitle">Painel de regulação e censo</p>
+      <p class="brand-subtitle">Administração</p>
       <nav class="nav">
         <a class="primary" href="/dashboard">Dashboard</a>
         <a href="/pacientes">Pacientes</a>
@@ -325,6 +338,7 @@ def dashboard_page() -> str:
         A pergunta principal desta tela é simples: <strong>como está a ocupação hoje?</strong>
         Use os filtros acima para refinar a leitura.
       </div>
+      <div class="sidebar-version">v{settings.app_version} · {settings.app_env}</div>
     </aside>
     <main class="main">
       <div class="shell">
@@ -759,6 +773,10 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
     .nav a:hover {{ background: rgba(0, 92, 153, 0.06); border-color: var(--panel-border); }}
     .nav a.primary {{ background: var(--brand); color: #fff; }}
     .nav a.primary:hover {{ background: var(--brand-strong); border-color: transparent; }}
+    .sidebar {{
+      display: flex;
+      flex-direction: column;
+    }}
     .sidebar-note {{
       margin-top: 18px;
       padding: 12px;
@@ -990,6 +1008,16 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
     .modal-close:hover {{ background:#edf2f7; color:var(--text); }}
     .modal-body {{ padding:20px; }}
     .modal-loading {{ text-align:center; padding:40px; color:var(--muted); }}
+    .sidebar-version {{
+      margin-top: auto; padding: 10px 12px; border-radius: 10px;
+      background: rgba(0,0,0,0.04); color: var(--muted); font-size: 11px;
+      text-align: center; letter-spacing: .02em;
+    }}
+    .sidebar-version {{
+      margin-top: auto; padding: 10px 12px; border-radius: 10px;
+      background: rgba(0,0,0,0.04); color: var(--muted); font-size: 11px;
+      text-align: center; letter-spacing: .02em;
+    }}
 
     @media (max-width: 1100px) {{
       .layout {{ grid-template-columns: 1fr; }}
@@ -997,19 +1025,25 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
       .filters-grid {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
       .leitos-grid {{ grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }}
     }}
+      .sidebar-version {
+      margin-top: auto; padding: 10px 12px; border-radius: 10px;
+      background: rgba(0,0,0,0.04); color: var(--muted); font-size: 11px;
+      text-align: center; letter-spacing: .02em;
+    }
   </style>
 </head>
 <body>
   <div class="layout">
     <aside class="sidebar">
       <p class="brand">EGAA</p>
-      <p class="brand-subtitle">Painel de regulação e censo</p>
+      <p class="brand-subtitle">Administração</p>
       <nav class="nav">
         {nav_html}
       </nav>
       <div class="sidebar-note">
         {subtitle}
       </div>
+      <div class="sidebar-version">v{settings.app_version} · {settings.app_env}</div>
     </aside>
     <main class="main">
       <div class="shell">
@@ -1235,58 +1269,269 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
     const modalTitle = document.getElementById('modalTitle');
     const modalClose = document.getElementById('modalClose');
 
+    // Cache de dados do modal para re-render
+    let modalProntuario = '';
+    let modalPacienteNome = '';
+    let modalTipos = [];
+    let modalCodigosPendencia = [];
+
     async function abrirModal(prontuario) {{
+      modalProntuario = prontuario;
       modalBackdrop.classList.add('open');
       modalTitle.textContent = 'Carregando paciente...';
       modalBody.innerHTML = '<div class="modal-loading">Carregando dados do paciente...</div>';
-      try {{
-        const res = await fetch(`${{API_PREFIX}}/censo/paciente/${{encodeURIComponent(prontuario)}}`);
-        if (!res.ok) throw new Error('Erro ' + res.status);
-        const data = await res.json();
-        modalTitle.textContent = (data.nome_paciente || 'Paciente') + ' #' + (data.prontuario || '');
-        const evolucao = escapeHtml(data.evolucao || '');
-        const nome = escapeHtml(data.nome_paciente || '--');
-        const especialidade = escapeHtml(data.especialidade || '--');
-        const unidade = escapeHtml(data.unidade || '--');
-        const enfermaria = escapeHtml(data.enfermaria || '--');
-        const leito = escapeHtml(data.leito || '--');
-        const cidCod = escapeHtml(data.cid_internacao_codigo || '--');
-        const cidDesc = escapeHtml(data.cid_internacao_descricao || '');
-        const dataInternacao = data.data_internacao ? new Intl.DateTimeFormat('pt-BR').format(new Date(data.data_internacao)) : '--';
-        const egaaTotal = data.egaa_total_atuacoes || 0;
-        const egaaUltima = data.egaa_ultima_atuacao ? new Intl.DateTimeFormat('pt-BR').format(new Date(data.egaa_ultima_atuacao)) : '--';
 
+      try {{
+        // Carrega dados do paciente, tipos e códigos em paralelo
+        const [pacRes, tiposRes, codigosRes] = await Promise.all([
+          fetch(`${{API_PREFIX}}/censo/paciente/${{encodeURIComponent(prontuario)}}`),
+          fetch(`${{API_PREFIX}}/egaa/tipos-intervencao`),
+          fetch(`${{API_PREFIX}}/egaa/pendencia/codigos`)
+        ]);
+
+        const paciente = pacRes.ok ? await pacRes.json() : {{ nome_paciente: '--', prontuario: prontuario }};
+        modalPacienteNome = paciente.nome_paciente || '--';
+        modalTipos = tiposRes.ok ? (await tiposRes.json()) || [] : [];
+        modalCodigosPendencia = codigosRes.ok ? (await codigosRes.json()) || [] : [];
+
+        modalTitle.textContent = (paciente.nome_paciente || 'Paciente') + ' #' + (paciente.prontuario || '');
+
+        // Renderiza layout do modal
         modalBody.innerHTML = `
-          <div class="cards" style="margin-top:0;">
-            <div class="card"><strong>Prontuário</strong><div class="kpi-value" style="font-size:22px;">#${{data.prontuario}}</div></div>
-            <div class="card"><strong>Dias internado</strong><div class="kpi-value" style="font-size:22px;">${{data.dias_internacao ?? '--'}}</div></div>
-            <div class="card"><strong>Idade</strong><div class="kpi-value" style="font-size:22px;">${{data.idade_anos ?? '--'}} anos</div></div>
-            <div class="card"><strong>EGAA</strong><div class="kpi-value" style="font-size:18px;line-height:1.3;">${{egaaTotal}} atuações<br><span style="font-size:13px;font-weight:400;">Última: ${{egaaUltima}}</span></div></div>
-          </div>
-          <div class="grid" style="margin-top:12px;grid-template-columns:1.2fr 1fr;">
-            <div class="section">
-              <div class="section-header"><h2 style="font-size:14px;">Resumo clínico</h2></div>
-              <div class="section-body" style="padding:12px 16px;">
-                <div class="muted" style="font-size:13px;line-height:1.6;">
-                  <strong>Nome:</strong> ${{nome}}<br>
-                  <strong>Especialidade:</strong> ${{especialidade}}<br>
-                  <strong>Unidade:</strong> ${{unidade}} · <strong>Enfermaria:</strong> ${{enfermaria}}<br>
-                  <strong>Leito:</strong> ${{leito}}<br>
-                  <strong>CID:</strong> ${{cidCod}} ${{cidDesc ? '- ' + cidDesc : ''}}<br>
-                  <strong>Internação:</strong> ${{dataInternacao}}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <!-- Coluna 1: Ações EGAA -->
+            <div>
+              <div class="section" style="margin-top:0;">
+                <div class="section-header"><h2 style="font-size:14px;">📝 Nova atuação</h2></div>
+                <div class="section-body" style="padding:12px 14px;">
+                  <div class="field" style="margin-bottom:10px;">
+                    <label>Tipo de intervenção</label>
+                    <select id="modalTipoIntervencao" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #cfd8e3;">
+                      <option value="">Selecione...</option>
+                      ${{modalTipos.filter(t=>t.ativo).map(t => `<option value="${{t.id}}">${{escapeHtml(t.nome)}}</option>`).join('')}}
+                    </select>
+                  </div>
+                  <div class="field" style="margin-bottom:10px;">
+                    <label>Descrição</label>
+                    <textarea id="modalDescricao" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #cfd8e3;min-height:80px;font:inherit;resize:vertical;"></textarea>
+                  </div>
+                  <button type="button" id="modalSalvarAtuacao" style="width:100%;">Adicionar atuação</button>
+                  <span id="modalAtuacaoStatus" class="muted" style="font-size:13px;display:block;margin-top:6px;"></span>
+                </div>
+              </div>
+              <div class="section" style="margin-top:10px;">
+                <div class="section-header"><h2 style="font-size:14px;">📄 Evolução do paciente</h2></div>
+                <div class="section-body" style="padding:12px 14px;">
+                  <textarea id="modalEvolucao" style="width:100%;min-height:80px;padding:10px 12px;border-radius:10px;border:1px solid #cfd8e3;font:inherit;resize:vertical;">${{escapeHtml(paciente.evolucao || '')}}</textarea>
+                  <div style="display:flex;gap:8px;margin-top:8px;">
+                    <button type="button" id="modalSalvarEvolucao" style="flex:1;">Salvar evolução</button>
+                    <span id="modalEvolucaoStatus" class="muted" style="font-size:13px;align-self:center;"></span>
+                  </div>
                 </div>
               </div>
             </div>
-            <div class="section">
-              <div class="section-header"><h2 style="font-size:14px;">Evolução EGAA</h2></div>
-              <div class="section-body" style="padding:12px 16px;">
-                <div style="font-size:13px;line-height:1.6;white-space:pre-wrap;max-height:180px;overflow-y:auto;">${{evolucao || '<span class="muted">Nenhuma evolução registrada.</span>'}}</div>
+
+            <!-- Coluna 2: Timeline + Pendências -->
+            <div>
+              <div class="section" style="margin-top:0;">
+                <div class="section-header">
+                  <h2 style="font-size:14px;">📋 Intervenções</h2>
+                  <span id="modalIntervCount" class="muted" style="font-size:12px;"></span>
+                </div>
+                <div class="section-body" style="padding:8px 14px 12px;max-height:320px;overflow-y:auto;" id="modalTimeline">
+                  <div class="muted">Carregando intervenções...</div>
+                </div>
+              </div>
+              <div class="section" style="margin-top:10px;">
+                <div class="section-header">
+                  <h2 style="font-size:14px;">🚧 Pendências para alta</h2>
+                  <span id="modalPendCount" class="muted" style="font-size:12px;"></span>
+                </div>
+                <div class="section-body" style="padding:8px 14px 12px;" id="modalPendencias">
+                  <div class="muted">Carregando pendências...</div>
+                  <div style="display:flex;gap:6px;margin-top:10px;">
+                    <select id="modalNovaPendencia" style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid #cfd8e3;">
+                      <option value="">Adicionar pendência...</option>
+                      ${{modalCodigosPendencia.map(c => `<option value="${{c.codigo}}">${{escapeHtml(c.rotulo || c.codigo)}}</option>`).join('')}}
+                    </select>
+                    <button type="button" id="modalAddPendencia" style="padding:8px 12px;">+</button>
+                  </div>
+                  <span id="modalPendenciaStatus" class="muted" style="font-size:13px;display:block;margin-top:4px;"></span>
+                </div>
               </div>
             </div>
           </div>
           <div style="margin-top:14px;text-align:center;">
-            <a href="/paciente/${{encodeURIComponent(data.prontuario)}}" class="pill-link" style="display:inline-flex;">Abrir página completa do paciente →</a>
+            <a href="/paciente/${{encodeURIComponent(paciente.prontuario)}}" class="pill-link" style="display:inline-flex;">Abrir página completa do paciente →</a>
           </div>`;
+
+        // Carrega timeline e pendências
+        carregarTimeline(prontuario);
+        carregarPendencias(prontuario);
+
+        // Eventos do modal
+        document.getElementById('modalSalvarAtuacao').addEventListener('click', () => salvarAtuacao(prontuario));
+        document.getElementById('modalSalvarEvolucao').addEventListener('click', () => salvarEvolucaoModal(prontuario));
+        document.getElementById('modalAddPendencia').addEventListener('click', () => adicionarPendencia(prontuario));
+
+      }} catch (err) {{
+        modalTitle.textContent = 'Erro ao carregar';
+        modalBody.innerHTML = '<div class="modal-loading" style="color:var(--error);">Não foi possível carregar os dados do paciente.</div>';
+      }}
+    }}
+
+    async function carregarTimeline(prontuario) {{
+      const el = document.getElementById('modalTimeline');
+      const countEl = document.getElementById('modalIntervCount');
+      try {{
+        const res = await fetch(`${{API_PREFIX}}/egaa/intervencoes?prontuario=${{encodeURIComponent(prontuario)}}`);
+        const items = res.ok ? (await res.json()) || [] : [];
+        countEl.textContent = items.length + ' registro(s)';
+        el.innerHTML = items.length
+          ? items.map(item => {{
+              const tipoNome = escapeHtml(modalTipos.find(t=>t.id===item.tipo_intervencao_id)?.nome || '--');
+              const dataAtu = item.data_atuacao ? fmtDate(item.data_atuacao) : '--';
+              const statusClass = item.status === 'concluida' ? 'badge-success' : item.status === 'em_andamento' ? 'badge-warning' : 'badge-info';
+              const statusLabel = item.status === 'concluida' ? 'Concluída' : item.status === 'em_andamento' ? 'Em andamento' : 'Aberta';
+              return `
+                <div style="padding:10px 12px;border:1px solid var(--panel-border);border-radius:10px;margin-bottom:8px;background:#fff;">
+                  <div style="display:flex;align-items:start;justify-content:space-between;gap:8px;">
+                    <div>
+                      <span class="badge ${{statusClass}}" style="margin-bottom:4px;">${{statusLabel}}</span>
+                      <div style="font-weight:700;color:var(--brand-strong);font-size:14px;">${{tipoNome}}</div>
+                      <div class="muted" style="font-size:12px;margin-top:2px;">${{escapeHtml(item.descricao || '')}}</div>
+                      <div class="muted" style="font-size:12px;margin-top:4px;">${{dataAtu}} · ${{escapeHtml(item.usuario_responsavel || '--')}}</div>
+                    </div>
+                  </div>
+                </div>`;
+            }}).join('')
+          : '<div class="muted" style="text-align:center;padding:16px;">Nenhuma intervenção registrada.</div>';
+      }} catch {{
+        el.innerHTML = '<div class="muted" style="text-align:center;padding:16px;">Erro ao carregar intervenções.</div>';
+      }}
+    }}
+
+    async function carregarPendencias(prontuario) {{
+      const el = document.getElementById('modalPendencias');
+      const countEl = document.getElementById('modalPendCount');
+      try {{
+        const res = await fetch(`${{API_PREFIX}}/egaa/pendencia/${{encodeURIComponent(prontuario)}}`);
+        const items = res.ok ? (await res.json()) || [] : [];
+        const pendentes = items.filter(i => !i.resolvida);
+        const resolvidas = items.filter(i => i.resolvida);
+        countEl.textContent = pendentes.length + ' pendente(s)';
+
+        let html = '';
+        if (items.length) {{
+          html += pendentes.map(function(p) {{
+            return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #edf2f7;">' +
+              '<span style="font-size:13px;">⬜ ' + escapeHtml(p.codigo || '--') + '</span>' +
+              '<button class="resolver-pendencia" data-id="' + p.id + '" data-pront="' + prontuario + '" style="padding:3px 8px;font-size:11px;background:#EEF5FA;color:var(--brand);border:1px solid var(--panel-border);border-radius:6px;cursor:pointer;">Resolver</button>' +
+              '</div>';
+          }}).join('');
+
+          if (resolvidas.length) {{
+            html += '<div style="margin-top:6px;font-size:12px;color:var(--muted);">✅ ' + resolvidas.length + ' resolvida(s)</div>';
+            html += resolvidas.map(function(p) {{
+              return '<div style="display:flex;align-items:center;padding:4px 0;font-size:12px;color:var(--muted);">' +
+                '<span style="text-decoration:line-through;">☑ ' + escapeHtml(p.codigo || '--') + '</span></div>';
+            }}).join('');
+          }}
+        }} else {{
+          html += '<div class="muted" style="text-align:center;padding:16px;">Nenhuma pendência registrada.</div>';
+        }}
+
+        html += '<div style="display:flex;gap:6px;margin-top:10px;">' +
+          '<select id="modalNovaPendencia" style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid #cfd8e3;">' +
+          '<option value="">Adicionar pendência...</option>';
+        for (var ci = 0; ci < modalCodigosPendencia.length; ci++) {{
+          var c = modalCodigosPendencia[ci];
+          html += '<option value="' + c.codigo + '">' + escapeHtml(c.rotulo || c.codigo) + '</option>';
+        }}
+        html += '</select>' +
+          '<button type="button" id="modalAddPendencia" style="padding:8px 12px;">+</button>' +
+          '</div>' +
+          '<span id="modalPendenciaStatus" class="muted" style="font-size:13px;display:block;margin-top:4px;"></span>';
+
+        el.innerHTML = html;
+
+        document.getElementById('modalAddPendencia')?.addEventListener('click', function() {{ adicionarPendencia(prontuario); }});
+        el.querySelectorAll('.resolver-pendencia').forEach(function(btn) {{
+          btn.addEventListener('click', function() {{ resolverPendencia(btn.getAttribute('data-id'), btn.getAttribute('data-pront')); }});
+        }});
+      }} catch {{
+        countEl.textContent = '--';
+        // Keep existing elements
+      }}
+    }}
+
+    async function salvarAtuacao(prontuario) {{
+      const tipoId = document.getElementById('modalTipoIntervencao').value;
+      const descricao = document.getElementById('modalDescricao').value.trim();
+      const statusEl = document.getElementById('modalAtuacaoStatus');
+      if (!tipoId) {{ statusEl.textContent = 'Selecione um tipo de intervenção.'; return; }}
+      if (!descricao) {{ statusEl.textContent = 'Descreva a intervenção.'; return; }}
+      statusEl.textContent = 'Salvando...';
+      try {{
+        const res = await fetch(`${{API_PREFIX}}/egaa/intervencoes`, {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ prontuario, tipo_intervencao_id: parseInt(tipoId), titulo: modalTipos.find(t=>t.id==tipoId)?.nome || '', descricao, status: 'aberta', data_atuacao: new Date().toISOString().split('T')[0] }})
+        }});
+        if (!res.ok) throw new Error('Erro ' + res.status);
+        statusEl.textContent = '✅ Atuação salva!';
+        document.getElementById('modalDescricao').value = '';
+        document.getElementById('modalTipoIntervencao').value = '';
+        carregarTimeline(prontuario);
+      }} catch {{ statusEl.textContent = '❌ Erro ao salvar atuação.'; }}
+    }}
+
+    async function salvarEvolucaoModal(prontuario) {{
+      const text = document.getElementById('modalEvolucao').value;
+      const statusEl = document.getElementById('modalEvolucaoStatus');
+      statusEl.textContent = 'Salvando...';
+      try {{
+        const res = await fetch(`${{API_PREFIX}}/censo/paciente/${{encodeURIComponent(prontuario)}}/evolucao`, {{
+          method: 'PUT',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ evolucao: text }})
+        }});
+        if (!res.ok) throw new Error('Erro ' + res.status);
+        statusEl.textContent = '✅ Evolução salva!';
+        setTimeout(() => {{ statusEl.textContent = ''; }}, 3000);
+      }} catch {{ statusEl.textContent = '❌ Erro ao salvar evolução.'; }}
+    }}
+
+    async function adicionarPendencia(prontuario) {{
+      const select = document.getElementById('modalNovaPendencia');
+      const codigo = select?.value;
+      const statusEl = document.getElementById('modalPendenciaStatus');
+      if (!codigo) {{ statusEl.textContent = 'Selecione uma pendência.'; return; }}
+      statusEl.textContent = 'Adicionando...';
+      try {{
+        const res = await fetch(`${{API_PREFIX}}/egaa/pendencia/${{encodeURIComponent(prontuario)}}`, {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ codigo }})
+        }});
+        if (!res.ok) throw new Error('Erro ' + res.status);
+        statusEl.textContent = '✅ Pendência adicionada!';
+        select.value = '';
+        carregarPendencias(prontuario);
+      }} catch {{ statusEl.textContent = '❌ Erro ao adicionar pendência.'; }}
+    }}
+
+    async function resolverPendencia(pendenciaId, prontuario) {{
+      try {{
+        const res = await fetch(`${{API_PREFIX}}/egaa/pendencia/${{encodeURIComponent(prontuario)}}/${{pendenciaId}}`, {{
+          method: 'PUT',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ resolvida: true }})
+        }});
+        if (!res.ok) throw new Error('Erro ' + res.status);
+        carregarPendencias(prontuario);
+      }} catch {{ }}
+    }}
       }} catch (err) {{
         modalTitle.textContent = 'Erro ao carregar';
         modalBody.innerHTML = '<div class="modal-loading" style="color:var(--error);">Não foi possível carregar os dados do paciente.</div>';
@@ -1613,6 +1858,11 @@ def paciente_detail_route(prontuario: str) -> str:
       .grid {{ grid-template-columns: 1fr; }}
       .row {{ grid-template-columns: 1fr; }}
     }}
+    .sidebar-version {{
+      margin-top: auto; padding: 10px 12px; border-radius: 10px;
+      background: rgba(0,0,0,0.04); color: var(--muted); font-size: 11px;
+      text-align: center; letter-spacing: .02em;
+    }}
   </style>
 </head>
 <body>
@@ -1626,6 +1876,7 @@ def paciente_detail_route(prontuario: str) -> str:
         <a href="/longa-permanencia">Longa Permanência</a>
         <a href="/configuracoes">Configurações</a>
       </nav>
+      <div class="sidebar-version">v{settings.app_version} · {settings.app_env}</div>
     </aside>
     <main class="main">
       <div class="shell">
@@ -2489,13 +2740,18 @@ def configuracoes_route() -> str:
       .grid { grid-template-columns: 1fr; }
       .row { grid-template-columns: 1fr; }
     }
+      .sidebar-version {
+      margin-top: auto; padding: 10px 12px; border-radius: 10px;
+      background: rgba(0,0,0,0.04); color: var(--muted); font-size: 11px;
+      text-align: center; letter-spacing: .02em;
+    }
   </style>
 </head>
 <body>
   <div class="layout">
     <aside class="sidebar">
       <p class="brand">EGAA</p>
-      <p class="brand-subtitle">Painel de regulação e censo</p>
+      <p class="brand-subtitle">Administração</p>
       <nav class="nav">
         <a href="/dashboard">Dashboard</a>
         <a href="/pacientes">Pacientes</a>
@@ -2506,6 +2762,7 @@ def configuracoes_route() -> str:
       <div class="sidebar-note">
         Parametrização do fluxo operacional, com tipos de intervenção e registro rápido para acompanhamento da equipe.
       </div>
+      <div class="sidebar-version">v{settings.app_version} · {settings.app_env}</div>
     </aside>
     <main class="main">
       <div class="shell">
