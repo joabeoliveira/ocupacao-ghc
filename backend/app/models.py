@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 from sqlalchemy import CHAR, Boolean, Date, DateTime, ForeignKey, Integer, SmallInteger, String, Text
 from sqlalchemy.dialects.mysql import ENUM
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
@@ -103,3 +103,27 @@ class EgaaIntervencaoPaciente(Base):
     observacao: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class EgaaDesfecho(Base):
+    __tablename__ = "egaa_desfecho"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    prontuario: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    tipo: Mapped[str] = mapped_column(
+        ENUM("alta", "obito"),
+        nullable=False,
+        comment="Tipo de desfecho: alta ou obito",
+    )
+    data_desfecho: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    descricao: Mapped[str | None] = mapped_column(Text, nullable=True)
+    usuario_responsavel: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    intervencao_id: Mapped[int | None] = mapped_column(
+        ForeignKey("egaa_intervencao_paciente.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    intervencao: Mapped["EgaaIntervencaoPaciente | None"] = relationship("EgaaIntervencaoPaciente", lazy="joined")

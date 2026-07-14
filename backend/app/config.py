@@ -36,6 +36,9 @@ class Settings:
             ["http://localhost:3000"],
         )
     )
+    cors_origin_regex: str = field(
+        default_factory=lambda: os.getenv("CORS_ORIGIN_REGEX", r"https?://.*\.easypanel\.host$")
+    )
     upload_tmp_dir: str = field(default_factory=lambda: os.getenv("UPLOAD_TMP_DIR", "backend/tmp"))
 
     @property

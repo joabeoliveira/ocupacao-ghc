@@ -165,3 +165,47 @@ class PendenciaAltaCreate(BaseModel):
 
 class PendenciaAltaResolve(BaseModel):
     resolvida: bool = True
+
+
+# ─── Desfecho EGAA ──────────────────────────────────────────────
+
+class EgaaDesfechoCreate(BaseModel):
+    prontuario: str
+    tipo: str = Field(description="alta ou obito")
+    data_desfecho: date
+    descricao: str | None = None
+    usuario_responsavel: str | None = None
+    intervencao_id: int | None = None
+
+
+class EgaaDesfechoResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    prontuario: str
+    tipo: str
+    data_desfecho: date
+    descricao: str | None = None
+    usuario_responsavel: str | None = None
+    intervencao_id: int | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class EgaaDesfechoPorTipo(BaseModel):
+    tipo: str
+    total: int
+
+
+class EgaaDesfechoPorMes(BaseModel):
+    mes: str
+    total: int
+
+
+class EgaaIndicadoresDesfechoResponse(BaseModel):
+    total_desfechos: int
+    total_altas: int
+    total_obitos: int
+    pacientes_com_desfecho: int
+    por_tipo: list[EgaaDesfechoPorTipo]
+    por_mes: list[EgaaDesfechoPorMes]

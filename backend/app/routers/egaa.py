@@ -12,8 +12,13 @@ from fastapi.responses import StreamingResponse
 from datetime import datetime as dt_datetime
 
 from app.database import get_db
-from app.models import EgaaIntervencaoPaciente, EgaaPendenciaAlta, EgaaTipoIntervencao
+from app.models import EgaaDesfecho, EgaaIntervencaoPaciente, EgaaPendenciaAlta, EgaaTipoIntervencao
 from app.schemas import (
+    EgaaDesfechoCreate,
+    EgaaDesfechoResponse,
+    EgaaIndicadoresDesfechoResponse,
+    EgaaDesfechoPorMes,
+    EgaaDesfechoPorTipo,
     EgaaIntervencaoPacienteBatchCreate,
     EgaaIntervencaoPacienteCreate,
     EgaaIntervencaoPacienteResponse,
@@ -494,3 +499,166 @@ def remover_pendencia(
         raise HTTPException(status_code=404, detail="Pendência não encontrada.")
     db.delete(row)
     db.commit()
+
+
+# ─── Desfechos EGAA ──────────────────────────────────────────────
+
+
+@router.get("/desfechos", response_model=list[EgaaDesfechoResponse])
+def listar_desfechos(
+    prontuario: str | None = Query(default=None),
+    tipo: str | None = Query(default=None),
+    data_inicio: date | None = Query(default=None),
+    data_fim: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> list[EgaaDesfechoResponse]:
+    query = select(EgaaDesfecho)
+    if prontuario:
+        query = query.where(EgaaDesfecho.prontuario == prontuario)
+    if tipo:
+        query = query.where(EgaaDesfecho.tipo == tipo)
+    if data_inicio:
+        query = query.where(EgaaDesfecho.data_desfecho >= data_inicio)
+    if data_fim:
+        query = query.where(EgaaDesfecho.data_desfecho <= data_fim)
+
+    rows = db.execute(
+        query.order_by(
+            desc(EgaaDesfecho.data_desfecho),
+            desc(EgaaDesfecho.created_at),
+            desc(EgaaDesfecho.id),
+        )
+    ).scalars().all()
+    return [EgaaDesfechoResponse.model_validate(row) for row in rows]
+
+
+@router.post("/desfechos", response_model=EgaaDesfechoResponse, status_code=201)
+def criar_desfecho(
+    payload: EgaaDesfechoCreate,
+    db: Session = Depends(get_db),
+) -> EgaaDesfechoResponse:
+    if payload.tipo not in ("alta", "obito"):
+        raise HTTPException(status_code=400, detail="Tipo deve ser 'alta' ou 'obito'.")
+
+    if payload.intervencao_id is not None:
+        intervencao = db.scalar(
+            select(EgaaIntervencaoPaciente).where(EgaaIntervencaoPaciente.id == payload.intervencao_id)
+        )
+        if intervencao is None:
+            raise HTTPException(status_code=404, detail="Intervenção vinculada não encontrada.")
+
+    now = dt_datetime.utcnow()
+    row = EgaaDesfecho(
+        prontuario=payload.prontuario,
+        tipo=payload.tipo,
+        data_desfecho=payload.data_desfecho,
+        descricao=payload.descricao,
+        usuario_responsavel=payload.usuario_responsavel,
+        intervencao_id=payload.intervencao_id,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return EgaaDesfechoResponse.model_validate(row)
+
+
+@router.get("/desfechos/{desfecho_id}", response_model=EgaaDesfechoResponse)
+def get_desfecho(
+    desfecho_id: int,
+    db: Session = Depends(get_db),
+) -> EgaaDesfechoResponse:
+    row = db.scalar(select(EgaaDesfecho).where(EgaaDesfecho.id == desfecho_id))
+    if row is None:
+        raise HTTPException(status_code=404, detail="Desfecho não encontrado.")
+    return EgaaDesfechoResponse.model_validate(row)
+
+
+@router.put("/desfechos/{desfecho_id}", response_model=EgaaDesfechoResponse)
+def update_desfecho(
+    desfecho_id: int,
+    payload: EgaaDesfechoCreate,
+    db: Session = Depends(get_db),
+) -> EgaaDesfechoResponse:
+    row = db.scalar(select(EgaaDesfecho).where(EgaaDesfecho.id == desfecho_id))
+    if row is None:
+        raise HTTPException(status_code=404, detail="Desfecho não encontrado.")
+
+    if payload.tipo not in ("alta", "obito"):
+        raise HTTPException(status_code=400, detail="Tipo deve ser 'alta' ou 'obito'.")
+
+    if payload.intervencao_id is not None:
+        intervencao = db.scalar(
+            select(EgaaIntervencaoPaciente).where(EgaaIntervencaoPaciente.id == payload.intervencao_id)
+        )
+        if intervencao is None:
+            raise HTTPException(status_code=404, detail="Intervenção vinculada não encontrada.")
+
+    for field, value in payload.model_dump(exclude_none=True).items():
+        setattr(row, field, value)
+    row.updated_at = dt_datetime.utcnow()
+    db.commit()
+    db.refresh(row)
+    return EgaaDesfechoResponse.model_validate(row)
+
+
+@router.delete("/desfechos/{desfecho_id}", status_code=204)
+def delete_desfecho(
+    desfecho_id: int,
+    db: Session = Depends(get_db),
+) -> None:
+    row = db.scalar(select(EgaaDesfecho).where(EgaaDesfecho.id == desfecho_id))
+    if row is None:
+        raise HTTPException(status_code=404, detail="Desfecho não encontrado.")
+    db.delete(row)
+    db.commit()
+
+
+@router.get("/indicadores/desfechos", response_model=EgaaIndicadoresDesfechoResponse)
+def get_indicadores_desfecho(db: Session = Depends(get_db)) -> EgaaIndicadoresDesfechoResponse:
+    try:
+        total_desfechos = db.scalar(select(func.count()).select_from(EgaaDesfecho)) or 0
+        total_altas = db.scalar(
+            select(func.count()).select_from(EgaaDesfecho).where(EgaaDesfecho.tipo == "alta")
+        ) or 0
+        total_obitos = db.scalar(
+            select(func.count()).select_from(EgaaDesfecho).where(EgaaDesfecho.tipo == "obito")
+        ) or 0
+        pacientes_com_desfecho = db.scalar(
+            select(func.count(func.distinct(EgaaDesfecho.prontuario)))
+        ) or 0
+
+        tipo_rows = db.execute(
+            select(EgaaDesfecho.tipo, func.count().label("total"))
+            .group_by(EgaaDesfecho.tipo)
+            .order_by(EgaaDesfecho.tipo)
+        ).all()
+
+        mes_rows = db.execute(
+            select(
+                func.date_format(EgaaDesfecho.data_desfecho, "%Y-%m").label("mes"),
+                func.count().label("total"),
+            )
+            .where(EgaaDesfecho.data_desfecho.is_not(None))
+            .group_by("mes")
+            .order_by("mes")
+        ).all()
+    except Exception:
+        return EgaaIndicadoresDesfechoResponse(
+            total_desfechos=0,
+            total_altas=0,
+            total_obitos=0,
+            pacientes_com_desfecho=0,
+            por_tipo=[],
+            por_mes=[],
+        )
+
+    return EgaaIndicadoresDesfechoResponse(
+        total_desfechos=total_desfechos,
+        total_altas=total_altas,
+        total_obitos=total_obitos,
+        pacientes_com_desfecho=pacientes_com_desfecho,
+        por_tipo=[EgaaDesfechoPorTipo(tipo=row.tipo, total=row.total) for row in tipo_rows],
+        por_mes=[EgaaDesfechoPorMes(mes=row.mes, total=row.total) for row in mes_rows],
+    )

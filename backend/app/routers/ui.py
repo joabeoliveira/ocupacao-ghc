@@ -44,7 +44,8 @@ def upload_page() -> str:
     <a href="/dashboard" style="text-decoration:none;padding:8px 12px;border-radius:8px;background:#fff;border:1px solid #DCE3EA;color:var(--brand);font-weight:600;">Dashboard</a>
     <a href="/pacientes" style="text-decoration:none;padding:8px 12px;border-radius:8px;background:#fff;border:1px solid #DCE3EA;color:var(--brand);font-weight:600;">Pacientes</a>
     <a href="/longa-permanencia" style="text-decoration:none;padding:8px 12px;border-radius:8px;background:#fff;border:1px solid #DCE3EA;color:var(--brand);font-weight:600;">Longa Permanência</a>
-    <a href="/configuracoes" style="margin-left:auto;text-decoration:none;padding:8px 12px;border-radius:8px;background:#fff;border:1px solid #DCE3EA;color:var(--brand);font-weight:600;">Configurações</a>
+    <a href="/desfechos" style="text-decoration:none;padding:8px 12px;border-radius:8px;background:#fff;border:1px solid #DCE3EA;color:var(--brand);font-weight:600;">Desfechos EGAA</a>
+    <a href="/configuracoes" style="text-decoration:none;padding:8px 12px;border-radius:8px;background:#fff;border:1px solid #DCE3EA;color:var(--brand);font-weight:600;">Configurações</a>
   </div>
 
   <div class="card">
@@ -330,6 +331,7 @@ def dashboard_page() -> str:
         <a class="primary" href="/dashboard">Dashboard</a>
         <a href="/pacientes">Pacientes</a>
         <a href="/longa-permanencia">Longa Permanência</a>
+        <a href="/desfechos">Desfechos EGAA</a>
         <a href="/configuracoes">Configurações</a>
         <a href="/upload">Importações</a>
         <a href="#resumo">Resumo</a>
@@ -715,6 +717,7 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
         ("Dashboard", "/dashboard", title == "Dashboard"),
         ("Pacientes", "/pacientes", title == "Pacientes"),
         ("Longa Permanência", "/longa-permanencia", title == "Longa Permanência"),
+        ("Desfechos EGAA", "/desfechos", title == "Desfechos EGAA"),
         ("Configurações", "/configuracoes", title == "Configurações"),
         ("Importações", "/upload", False),
     ]
@@ -1884,6 +1887,7 @@ def paciente_detail_route(prontuario: str) -> str:
         <a href="/dashboard">Dashboard</a>
         <a class="primary" href="/pacientes">Voltar para Pacientes</a>
         <a href="/longa-permanencia">Longa Permanência</a>
+        <a href="/desfechos">Desfechos EGAA</a>
         <a href="/configuracoes">Configurações</a>
       </nav>
       <div class="sidebar-version">v{settings.app_version} · {settings.app_env}</div>
@@ -2766,6 +2770,7 @@ def configuracoes_route() -> str:
         <a href="/dashboard">Dashboard</a>
         <a href="/pacientes">Pacientes</a>
         <a href="/longa-permanencia">Longa Permanência</a>
+        <a href="/desfechos">Desfechos EGAA</a>
         <a class="primary" href="/configuracoes">Configurações</a>
         <a href="/upload">Importações</a>
       </nav>
@@ -3109,3 +3114,573 @@ def configuracoes_route() -> str:
 </html>
 """
     return html.replace("{settings.app_version}", settings.app_version).replace("{settings.app_env}", settings.app_env)
+
+
+@router.get("/desfechos", response_class=HTMLResponse)
+def desfechos_route() -> str:
+    html = """
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>EGAA - Desfechos EGAA</title>
+  <style>
+    :root {
+      --bg: #F7F9FB;
+      --panel: #FFFFFF;
+      --panel-border: #DCE3EA;
+      --text: #1F2937;
+      --muted: #6B7280;
+      --brand: #005C99;
+      --brand-strong: #004A7A;
+      --secondary: #00A79D;
+      --success: #2E7D32;
+      --warning: #F9A825;
+      --error: #C62828;
+      --info: #0288D1;
+    }
+    body {
+      font-family: Inter, Arial, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(0, 92, 153, 0.08), transparent 28%),
+        linear-gradient(180deg, #ffffff 0%, var(--bg) 100%);
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+    }
+    .layout { display:grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+    .sidebar {
+      background: rgba(255,255,255,0.84);
+      backdrop-filter: blur(10px);
+      border-right: 1px solid var(--panel-border);
+      padding: 24px 18px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      box-sizing: border-box;
+    }
+    .brand { font-size: 18px; font-weight: 700; color: var(--brand-strong); margin: 0; }
+    .brand-subtitle { margin: 6px 0 18px; color: var(--muted); font-size: 13px; }
+    .nav { display:flex; flex-direction:column; gap:8px; margin-top: 18px; }
+    .nav a {
+      color: var(--text);
+      text-decoration: none;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      font-weight: 600;
+    }
+    .nav a:hover { background: rgba(0, 92, 153, 0.06); border-color: var(--panel-border); }
+    .nav a.primary { background: var(--brand); color: #fff; }
+    .nav a.primary:hover { background: var(--brand-strong); border-color: transparent; }
+    .sidebar-note {
+      margin-top: 18px;
+      padding: 12px;
+      border-radius: 12px;
+      background: #F0F7FC;
+      border: 1px solid #D7E7F3;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .main { padding: 24px; }
+    .shell { max-width: 1240px; margin: 0 auto; }
+    .header { display:flex; align-items:center; justify-content:space-between; gap: 16px; margin-bottom: 16px; }
+    h1 { color:var(--brand-strong); margin:0; letter-spacing:-0.02em; }
+    .subtitle { margin: 8px 0 0; color: var(--muted); }
+    .header-actions { display:flex; gap: 10px; align-items:center; }
+    .pill-link {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      text-decoration:none;
+      padding:8px 16px;
+      border-radius:30px;
+      background:#fff;
+      border:1px solid var(--panel-border);
+      color:var(--text);
+      font-weight:600;
+      font-size:14px;
+    }
+    .pill-link:hover { border-color: var(--brand); color: var(--brand); }
+    .btn-primary {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:9px 18px;
+      border-radius:8px;
+      background:var(--brand);
+      color:#fff;
+      border:none;
+      font-weight:600;
+      font-size:14px;
+      cursor:pointer;
+    }
+    .btn-primary:hover { background:var(--brand-strong); }
+    .btn-secondary {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:9px 18px;
+      border-radius:8px;
+      background:#fff;
+      color:var(--text);
+      border:1px solid var(--panel-border);
+      font-weight:600;
+      font-size:14px;
+      cursor:pointer;
+    }
+    .btn-secondary:hover { border-color:var(--brand); color:var(--brand); }
+    .btn-danger {
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+      padding:5px 10px;
+      border-radius:6px;
+      background:transparent;
+      color:var(--error);
+      border:1px solid transparent;
+      font-weight:600;
+      font-size:12px;
+      cursor:pointer;
+    }
+    .btn-danger:hover { background:#FFF0F0; border-color:#FFCDD2; }
+    .kpis {
+      display:grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap:16px;
+      margin-bottom:20px;
+    }
+    .kpi-card {
+      background:var(--panel);
+      border:1px solid var(--panel-border);
+      border-radius:10px;
+      padding:16px;
+    }
+    .kpi-card .label { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; }
+    .kpi-card .value { font-size:26px; font-weight:800; color:var(--text); margin:4px 0; }
+    .kpi-card .sub { font-size:11px; color:var(--muted); }
+    .card {
+      background:var(--panel);
+      border:1px solid var(--panel-border);
+      border-radius:12px;
+      margin-bottom:20px;
+      overflow:hidden;
+    }
+    .card-header {
+      padding:16px 20px;
+      border-bottom:1px solid var(--panel-border);
+      background:#F8FAFC;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+    .card-header h3 { margin:0; font-size:16px; }
+    .card-header p { margin:4px 0 0; font-size:13px; color:var(--muted); }
+    .card-body { padding:0; overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; }
+    th {
+      text-align:left;
+      padding:10px 16px;
+      font-size:11px;
+      font-weight:700;
+      color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:0.5px;
+      border-bottom:1px solid var(--panel-border);
+      background:#F8FAFC;
+    }
+    td { padding:12px 16px; font-size:13px; border-bottom:1px solid var(--panel-border); }
+    tr:hover { background:#FAFBFD; }
+    .badge {
+      display:inline-block;
+      padding:2px 10px;
+      border-radius:20px;
+      font-size:11px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:0.3px;
+    }
+    .badge-success { background:#E8F5E9; color:var(--success); }
+    .badge-danger { background:#FFF0F0; color:var(--error); }
+    .filter-bar {
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+    .filter-bar input, .filter-bar select {
+      padding:7px 10px;
+      border:1px solid var(--panel-border);
+      border-radius:6px;
+      font-size:13px;
+    }
+    .filter-bar input:focus, .filter-bar select:focus {
+      outline:none;
+      border-color:var(--brand);
+    }
+    .mono { font-family: 'Courier New', monospace; font-size:13px; font-weight:700; }
+    .muted { color:var(--muted); }
+    .modal-overlay {
+      display:none;
+      position:fixed;
+      inset:0;
+      background:rgba(15,23,42,0.6);
+      backdrop-filter:blur(2px);
+      z-index:100;
+      align-items:center;
+      justify-content:center;
+    }
+    .modal-overlay.open { display:flex; }
+    .modal {
+      background:var(--panel);
+      border-radius:12px;
+      width:100%;
+      max-width:560px;
+      max-height:90vh;
+      overflow-y:auto;
+      box-shadow:0 20px 60px rgba(0,0,0,0.15);
+    }
+    .modal-header {
+      padding:16px 20px;
+      border-bottom:1px solid var(--panel-border);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .modal-header h3 { margin:0; font-size:16px; }
+    .modal-close {
+      background:none;
+      border:none;
+      font-size:20px;
+      cursor:pointer;
+      padding:4px 8px;
+      border-radius:6px;
+      color:var(--muted);
+    }
+    .modal-close:hover { background:#F1F5F9; color:var(--text); }
+    .modal-body { padding:20px; }
+    .field { margin-bottom:16px; }
+    .field label { display:block; font-size:13px; font-weight:600; margin-bottom:6px; color:var(--text); }
+    .field input, .field select, .field textarea {
+      width:100%;
+      padding:9px 12px;
+      border:1px solid var(--panel-border);
+      border-radius:8px;
+      font-size:14px;
+      box-sizing:border-box;
+    }
+    .field textarea { min-height:80px; resize:vertical; }
+    .field input:focus, .field select:focus, .field textarea:focus { outline:none; border-color:var(--brand); }
+    .modal-actions {
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      padding-top:16px;
+      border-top:1px solid var(--panel-border);
+      margin-top:8px;
+    }
+    .toast {
+      position:fixed;
+      bottom:24px;
+      right:24px;
+      background:#1F2937;
+      color:#fff;
+      padding:12px 20px;
+      border-radius:8px;
+      font-size:14px;
+      box-shadow:0 4px 12px rgba(0,0,0,0.15);
+      z-index:200;
+      opacity:0;
+      transition: opacity 0.3s;
+    }
+    .toast.show { opacity:1; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div>
+        <h2 class="brand">Painel EGAA</h2>
+        <p class="brand-subtitle">Censo Hospitalar GHC</p>
+      </div>
+      <nav class="nav">
+        <a href="/dashboard">Dashboard</a>
+        <a href="/pacientes">Pacientes</a>
+        <a href="/longa-permanencia">Longa Permanência</a>
+        <a class="primary" href="/desfechos">Desfechos EGAA</a>
+        <a href="/configuracoes">Configurações</a>
+        <a href="/upload">Importações</a>
+      </nav>
+      <div class="sidebar-note">
+        <strong>Desfechos EGAA</strong><br/>
+        Registre altas e óbitos com atuação do EGAA para demonstrar resultados da desospitalização.
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="shell">
+        <div class="header">
+          <div>
+            <h1>Desfechos EGAA</h1>
+            <p class="subtitle">Altas e óbitos com atuação do EGAA — demonstrando resultados da desospitalização</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn-primary" onclick="openModal()">+ Novo Desfecho</button>
+          </div>
+        </div>
+
+        <!-- KPIs -->
+        <div class="kpis">
+          <div class="kpi-card">
+            <div class="label">Total de Desfechos</div>
+            <div class="value" id="totalDesfechos">--</div>
+          </div>
+          <div class="kpi-card">
+            <div class="label">Altas</div>
+            <div class="value" id="totalAltas">--</div>
+            <div class="sub">Com apoio do EGAA</div>
+          </div>
+          <div class="kpi-card">
+            <div class="label">Óbitos</div>
+            <div class="value" id="totalObitos">--</div>
+            <div class="sub">Com suporte EGAA à família</div>
+          </div>
+          <div class="kpi-card">
+            <div class="label">Pacientes Atendidos</div>
+            <div class="value" id="totalPacientes">--</div>
+            <div class="sub">Com desfecho registrado</div>
+          </div>
+        </div>
+
+        <!-- Lista -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Registros de Desfechos</h3>
+              <p id="registroCount">Carregando...</p>
+            </div>
+            <div class="filter-bar">
+              <input type="text" id="searchInput" placeholder="Buscar prontuário..." oninput="applyFilters()" />
+              <select id="tipoFilter" onchange="applyFilters()">
+                <option value="">Todos os tipos</option>
+                <option value="alta">Altas</option>
+                <option value="obito">Óbitos</option>
+              </select>
+            </div>
+          </div>
+          <div class="card-body">
+            <table>
+              <thead>
+                <tr>
+                  <th>Prontuário</th>
+                  <th>Tipo</th>
+                  <th>Data</th>
+                  <th>Responsável</th>
+                  <th>Descrição</th>
+                  <th style="text-align:right;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="desfechosBody">
+                <tr><td colspan="6" class="muted" style="text-align:center;padding:32px;">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Novo Desfecho EGAA</h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="desfechoForm" onsubmit="submitDesfecho(event)">
+          <div class="field">
+            <label for="prontuario">Prontuário do Paciente</label>
+            <input id="prontuario" required placeholder="Ex: 8399062" />
+          </div>
+          <div class="field">
+            <label for="tipo">Tipo de Desfecho</label>
+            <select id="tipo" required>
+              <option value="alta">Alta Hospitalar</option>
+              <option value="obito">Óbito</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="dataDesfecho">Data do Desfecho</label>
+            <input id="dataDesfecho" type="date" required />
+          </div>
+          <div class="field">
+            <label for="descricao">Descrição / Observação</label>
+            <textarea id="descricao" placeholder="Descreva como o EGAA atuou neste desfecho..."></textarea>
+          </div>
+          <div class="field">
+            <label for="responsavel">Responsável EGAA</label>
+            <input id="responsavel" placeholder="Seu nome" />
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" onclick="closeModal()">Cancelar</button>
+            <button type="submit" class="btn-primary" id="submitBtn">Registrar Desfecho</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const API = '/api';
+
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 3000);
+    }
+
+    function openModal() {
+      document.getElementById('modalOverlay').classList.add('open');
+      document.getElementById('dataDesfecho').value = todayValue();
+    }
+
+    function closeModal() {
+      document.getElementById('modalOverlay').classList.remove('open');
+      document.getElementById('desfechoForm').reset();
+    }
+
+    function todayValue() {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    }
+
+    function fmtDate(value) {
+      if (!value) return '--';
+      try {
+        const d = new Date(value + 'T00:00:00');
+        return d.toLocaleDateString('pt-BR');
+      } catch { return value; }
+    }
+
+    let allDesfechos = [];
+
+    async function loadDesfechos() {
+      try {
+        const res = await fetch(API + '/egaa/desfechos');
+        if (!res.ok) throw new Error(await res.text());
+        allDesfechos = await res.json();
+        applyFilters();
+      } catch (e) {
+        document.getElementById('desfechosBody').innerHTML =
+          '<tr><td colspan="6" class="muted" style="text-align:center;padding:32px;">Erro ao carregar: ' + e.message + '</td></tr>';
+      }
+    }
+
+    async function loadIndicadores() {
+      try {
+        const res = await fetch(API + '/egaa/indicadores/desfechos');
+        if (!res.ok) return;
+        const data = await res.json();
+        document.getElementById('totalDesfechos').textContent = data.total_desfechos ?? 0;
+        document.getElementById('totalAltas').textContent = data.total_altas ?? 0;
+        document.getElementById('totalObitos').textContent = data.total_obitos ?? 0;
+        document.getElementById('totalPacientes').textContent = data.pacientes_com_desfecho ?? 0;
+      } catch (e) {
+        console.error('Erro ao carregar indicadores:', e);
+      }
+    }
+
+    function applyFilters() {
+      const search = document.getElementById('searchInput').value;
+      const tipo = document.getElementById('tipoFilter').value;
+
+      let filtered = allDesfechos;
+      if (search) {
+        filtered = filtered.filter(d => d.prontuario.includes(search) || (d.descricao && d.descricao.toLowerCase().includes(search.toLowerCase())));
+      }
+      if (tipo) {
+        filtered = filtered.filter(d => d.tipo === tipo);
+      }
+
+      document.getElementById('registroCount').textContent = filtered.length + ' registro(s) encontrado(s)';
+
+      if (!filtered.length) {
+        document.getElementById('desfechosBody').innerHTML =
+          '<tr><td colspan="6" class="muted" style="text-align:center;padding:32px;">Nenhum desfecho encontrado.</td></tr>';
+        return;
+      }
+
+      document.getElementById('desfechosBody').innerHTML = filtered.map(d => {
+        const badgeClass = d.tipo === 'alta' ? 'badge-success' : 'badge-danger';
+        const label = d.tipo === 'alta' ? 'Alta' : 'Óbito';
+        return '<tr>' +
+          '<td class="mono">' + d.prontuario + '</td>' +
+          '<td><span class="badge ' + badgeClass + '">' + label + '</span></td>' +
+          '<td class="muted">' + fmtDate(d.data_desfecho) + '</td>' +
+          '<td>' + (d.usuario_responsavel || '-') + '</td>' +
+          '<td class="muted" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (d.descricao || '-') + '</td>' +
+          '<td style="text-align:right;"><button class="btn-danger" onclick="deleteDesfecho(' + d.id + ')">Remover</button></td>' +
+          '</tr>';
+      }).join('');
+    }
+
+    async function deleteDesfecho(id) {
+      if (!confirm('Tem certeza que deseja remover este desfecho?')) return;
+      try {
+        const res = await fetch(API + '/egaa/desfechos/' + id, { method: 'DELETE' });
+        if (!res.ok) throw new Error(await res.text());
+        showToast('Desfecho removido com sucesso!');
+        await loadDesfechos();
+        await loadIndicadores();
+      } catch (e) {
+        showToast('Erro ao remover: ' + e.message);
+      }
+    }
+
+    async function submitDesfecho(event) {
+      event.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Salvando...';
+
+      const payload = {
+        prontuario: document.getElementById('prontuario').value.trim(),
+        tipo: document.getElementById('tipo').value,
+        data_desfecho: document.getElementById('dataDesfecho').value,
+        descricao: document.getElementById('descricao').value.trim() || null,
+        usuario_responsavel: document.getElementById('responsavel').value.trim() || null,
+      };
+
+      try {
+        const res = await fetch(API + '/egaa/desfechos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        showToast('Desfecho registrado com sucesso!');
+        closeModal();
+        await loadDesfechos();
+        await loadIndicadores();
+      } catch (e) {
+        showToast('Erro: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Registrar Desfecho';
+      }
+    }
+
+    loadDesfechos();
+    loadIndicadores();
+  </script>
+</body>
+</html>
+"""
+    return html
