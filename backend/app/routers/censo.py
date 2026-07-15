@@ -29,16 +29,26 @@ def _resolve_snapshot_bounds(
     db: Session,
     data_inicio: date | None,
     data_fim: date | None,
-) -> tuple[date | None, date | None]:
+) -> tuple[date | None, date | None, str | None]:
     if data_inicio is not None or data_fim is not None:
-        return data_inicio, data_fim
+        return data_inicio, data_fim, None
 
-    latest_snapshot = db.scalar(
-        select(func.max(OcupacaoLeitoGHC.data_snapshot)).where(OcupacaoLeitoGHC.fonte_dado == "censo_diario")
+    latest_lote = db.scalar(
+        select(OcupacaoLeitoGHC.lote_importacao_id)
+        .where(OcupacaoLeitoGHC.fonte_dado == "censo_diario")
+        .order_by(desc(OcupacaoLeitoGHC.data_snapshot), desc(OcupacaoLeitoGHC.created_at))
+        .limit(1)
     )
-    if latest_snapshot is None:
-        return None, None
-    return latest_snapshot, latest_snapshot
+    if latest_lote is None:
+        return None, None, None
+
+    lote_snapshot = db.scalar(
+        select(OcupacaoLeitoGHC.data_snapshot).where(
+            OcupacaoLeitoGHC.lote_importacao_id == latest_lote,
+            OcupacaoLeitoGHC.fonte_dado == "censo_diario",
+        )
+    )
+    return lote_snapshot, lote_snapshot, latest_lote
 
 
 def _active_filter():
@@ -48,28 +58,21 @@ def _active_filter():
     )
 
 
-def _apply_date_filter(query, data_inicio: date | None, data_fim: date | None):
-    if data_inicio is None and data_fim is None:
-        return query
-
-    query = query.where(_date_filter_expression(data_inicio, data_fim))
+def _apply_filters(query, data_inicio: date | None, data_fim: date | None, lote_importacao_id: str | None):
+    if lote_importacao_id is not None:
+        query = query.where(OcupacaoLeitoGHC.lote_importacao_id == lote_importacao_id)
+    if data_inicio is not None and data_fim is not None:
+        query = query.where(OcupacaoLeitoGHC.data_snapshot.between(data_inicio, data_fim))
+    elif data_inicio is not None:
+        query = query.where(OcupacaoLeitoGHC.data_snapshot >= data_inicio)
+    elif data_fim is not None:
+        query = query.where(OcupacaoLeitoGHC.data_snapshot <= data_fim)
     return query
 
 
-def _date_filter_expression(data_inicio: date | None, data_fim: date | None):
-    reference_date = OcupacaoLeitoGHC.data_snapshot
-    if data_inicio is not None and data_fim is not None:
-        return reference_date.between(data_inicio, data_fim)
-    if data_inicio is not None:
-        return reference_date >= data_inicio
-    if data_fim is not None:
-        return reference_date <= data_fim
-    return True
-
-
-def _filtered_active_query(data_inicio: date | None = None, data_fim: date | None = None):
+def _filtered_active_query(data_inicio: date | None = None, data_fim: date | None = None, lote_importacao_id: str | None = None):
     query = select(OcupacaoLeitoGHC).where(_active_filter())
-    return _apply_date_filter(query, data_inicio, data_fim)
+    return _apply_filters(query, data_inicio, data_fim, lote_importacao_id)
 
 
 def _egaa_summary_map(db: Session, prontuarios: list[str]) -> dict[str, dict[str, object]]:
@@ -102,7 +105,7 @@ def get_censo_kpis(
     db: Session = Depends(get_db),
 ) -> CensoKPIsResponse:
     try:
-        data_inicio, data_fim = _resolve_snapshot_bounds(db, data_inicio, data_fim)
+        data_inicio, data_fim, lote_id = _resolve_snapshot_bounds(db, data_inicio, data_fim)
         if data_inicio is None and data_fim is None:
             return CensoKPIsResponse(
                 total_internados=0,
@@ -121,7 +124,7 @@ def get_censo_kpis(
                 ocupacao_por_unidade=[],
             )
 
-        base_query = _filtered_active_query(data_inicio, data_fim)
+        base_query = _filtered_active_query(data_inicio, data_fim, lote_id)
         base_subquery = base_query.subquery()
 
         total_internados = db.scalar(select(func.count()).select_from(base_subquery)) or 0
@@ -151,7 +154,7 @@ def get_censo_kpis(
         # Normaliza o leito para capturar variacoes da emergencia, ex.: 111.01 -> 111.
         leito_normalizado = func.trim(func.coalesce(OcupacaoLeitoGHC.leito, ""))
         leito_base = func.substring_index(leito_normalizado, ".", 1)
-        base_leitos = db.execute(
+        base_leitos_query = (
             select(
                 func.count().label("total_leitos"),
                 func.sum(case((OcupacaoLeitoGHC.status_leito == "Ocupado", 1), else_=0)).label("leitos_ocupados"),
@@ -184,8 +187,9 @@ def get_censo_kpis(
                 ).label("operacionais_sem_emergencia"),
             )
             .where(OcupacaoLeitoGHC.fonte_dado == "censo_diario")
-            .where(_date_filter_expression(data_inicio, data_fim))
-        ).one()
+        )
+        base_leitos_query = _apply_filters(base_leitos_query, data_inicio, data_fim, lote_id)
+        base_leitos = db.execute(base_leitos_query).one()
 
         total_leitos = int(base_leitos.total_leitos or 0)
         leitos_ocupados = int(base_leitos.leitos_ocupados or 0)
@@ -209,10 +213,9 @@ def get_censo_kpis(
             select(OcupacaoLeitoGHC.unidade, func.count().label("total_pacientes"))
             .select_from(OcupacaoLeitoGHC)
             .where(_active_filter())
-            .where(_date_filter_expression(data_inicio, data_fim))
-            .group_by(OcupacaoLeitoGHC.unidade)
-            .order_by(desc("total_pacientes"), OcupacaoLeitoGHC.unidade)
         )
+        unidades_query = _apply_filters(unidades_query, data_inicio, data_fim, lote_id)
+        unidades_query = unidades_query.group_by(OcupacaoLeitoGHC.unidade).order_by(desc("total_pacientes"), OcupacaoLeitoGHC.unidade)
         unidades = db.execute(unidades_query).all()
     except Exception:
         return CensoKPIsResponse(
@@ -267,11 +270,11 @@ def get_pacientes_internados(
     db: Session = Depends(get_db),
 ) -> PacientesInternadosPage:
     try:
-        data_inicio, data_fim = _resolve_snapshot_bounds(db, data_inicio, data_fim)
+        data_inicio, data_fim, lote_id = _resolve_snapshot_bounds(db, data_inicio, data_fim)
         if data_inicio is None and data_fim is None:
             return PacientesInternadosPage(total=0, page=page, page_size=page_size, items=[])
 
-        base_query = _filtered_active_query(data_inicio, data_fim)
+        base_query = _filtered_active_query(data_inicio, data_fim, lote_id)
         if especialidade:
             base_query = base_query.where(OcupacaoLeitoGHC.especialidade == especialidade)
         if unidade:
