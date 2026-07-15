@@ -36,7 +36,8 @@ def _resolve_snapshot_bounds(
     latest_lote = db.scalar(
         select(OcupacaoLeitoGHC.lote_importacao_id)
         .where(OcupacaoLeitoGHC.fonte_dado == "censo_diario")
-        .order_by(desc(OcupacaoLeitoGHC.data_snapshot), desc(OcupacaoLeitoGHC.created_at))
+        .group_by(OcupacaoLeitoGHC.lote_importacao_id)
+        .order_by(desc(func.max(OcupacaoLeitoGHC.id)))
         .limit(1)
     )
     if latest_lote is None:
