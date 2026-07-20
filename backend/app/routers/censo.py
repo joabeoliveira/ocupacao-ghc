@@ -323,14 +323,14 @@ def get_paciente_por_prontuario(
     prontuario: str,
     db: Session = Depends(get_db),
 ) -> PacienteInternadoResponse:
-    data_inicio, data_fim = _resolve_snapshot_bounds(db, None, None)
+    data_inicio, data_fim, lote_id = _resolve_snapshot_bounds(db, None, None)
     if data_inicio is None and data_fim is None:
         raise HTTPException(status_code=404, detail="Paciente não encontrado.")
 
+    query = select(OcupacaoLeitoGHC).where(_active_filter())
+    query = _apply_filters(query, data_inicio, data_fim, lote_id)
     row = db.scalar(
-        select(OcupacaoLeitoGHC)
-        .where(_active_filter())
-        .where(_date_filter_expression(data_inicio, data_fim))
+        query
         .where(OcupacaoLeitoGHC.prontuario == prontuario)
         .order_by(desc(OcupacaoLeitoGHC.dias_internacao), OcupacaoLeitoGHC.nome_paciente)
     )
