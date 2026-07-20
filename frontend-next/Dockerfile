@@ -1,3 +1,4 @@
+# Build stage — contexto: frontend-next/
 FROM node:20-alpine AS builder
 
 WORKDIR /app
@@ -6,6 +7,7 @@ RUN npm install
 COPY . .
 RUN npm run build
 
+# Runner stage — v2026-07-20-corrigido
 FROM node:20-alpine AS runner
 
 WORKDIR /app
