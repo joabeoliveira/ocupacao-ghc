@@ -1,0 +1,6 @@
+{
+  "name": "Painel de Regulação e Censo Hospitalar",
+  "description": "Sistema integrado de monitoramento de leitos, longa permanência e acompanhamento do EGAA no Grupo Hospitalar Conceição.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
