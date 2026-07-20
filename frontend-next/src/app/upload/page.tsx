@@ -67,11 +67,13 @@ export default function UploadPage() {
     setIsUploading(true);
     setUploadResult(null);
 
-    // Map tab type to API endpoint
-    const endpoints = {
-      censo: '/api/upload/censo',
-      historico: '/api/upload/historico',
-      arquivo: '/api/upload/arquivo'
+    const API_URL = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+
+    // Map tab type to backend endpoint (direto, sem proxy Next.js)
+    const endpoints: Record<string, string> = {
+      censo: `${API_URL}/upload/censo`,
+      historico: `${API_URL}/upload/historico`,
+      arquivo: `${API_URL}/upload/arquivo`
     };
 
     try {
