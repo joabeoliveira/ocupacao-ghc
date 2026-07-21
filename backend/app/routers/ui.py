@@ -524,78 +524,247 @@ def dashboard_page() -> str:
     function renderColumnChart(container, {labels, series, colors, options={}}) {
       container.innerHTML = '';
       try {
-        const width = container.clientWidth || 600;
-        const height = options.height || 220;
-        const padding = {top:20, right:12, bottom:40, left:40};
-        const innerW = width - padding.left - padding.right;
-        const innerH = height - padding.top - padding.bottom;
-        const maxVal = Math.max(...series.flatMap(s => s.values));
         const svgNS = 'http://www.w3.org/2000/svg';
-        const svg = document.createElementNS(svgNS, 'svg');
-        svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-        svg.setAttribute('width', '100%');
-        svg.setAttribute('height', height);
-
-        // grid
-        const grid = document.createElementNS(svgNS, 'g');
-        const lines = 4;
-        for (let i=0;i<=lines;i++){
-          const y = padding.top + (innerH * i / lines);
-          const line = document.createElementNS(svgNS,'line');
-          line.setAttribute('x1', padding.left);
-          line.setAttribute('x2', padding.left + innerW);
-          line.setAttribute('y1', y);
-          line.setAttribute('y2', y);
-          line.setAttribute('stroke', 'var(--muted)');
-          line.setAttribute('stroke-width', '1');
-          grid.appendChild(line);
+        function getSeriesColor(key, idx, fallback) {
+          const map = {
+            intervencoes: 'var(--brand)',
+            altas: 'var(--success)',
+            abertas: 'var(--warning)',
+            pendentes: 'var(--warning)',
+            em_andamento: 'var(--secondary)',
+            concluidas: 'var(--success)'
+          };
+        
+          return (colors && colors[idx]) || fallback || map[key] || 'var(--brand)';
         }
-        svg.appendChild(grid);
 
-        const cols = labels.length;
-        const seriesCount = series.length || 1;
-        const bandWidth = innerW / Math.max(1, cols);
-        const barGap = Math.max(4, Math.floor(bandWidth * 0.08));
-        const barWidth = Math.max(6, Math.floor((bandWidth - barGap*2) / seriesCount));
+        const localSeries = (series || []).map((s, i) => ({ ...s, visible: typeof s.visible === 'boolean' ? s.visible : true, color: getSeriesColor((s.key || s.label || '').toString().toLowerCase(), i, s.color) }));
 
-        const barsGroup = document.createElementNS(svgNS,'g');
-        for (let i=0;i<cols;i++){
-          const xBase = padding.left + i * bandWidth;
-          for (let s=0;s<seriesCount;s++){
-            const val = series[s].values[i] || 0;
-            const h = maxVal === 0 ? 0 : (val / maxVal) * innerH;
-            const x = xBase + barGap + s * barWidth;
-            const y = padding.top + (innerH - h);
-            const rect = document.createElementNS(svgNS,'rect');
-            rect.setAttribute('x', x);
-            rect.setAttribute('y', y);
-            rect.setAttribute('width', Math.max(0, barWidth - 1));
-            rect.setAttribute('height', Math.max(0, h));
-            rect.setAttribute('fill', (colors && colors[s]) || 'var(--brand)');
-            rect.setAttribute('role','img');
-            rect.setAttribute('tabindex','0');
-            rect.setAttribute('aria-label', `${labels[i]}: ${series[s].label}: ${val}`);
-            rect.addEventListener('mouseenter', e => showTooltip(e, `${series[s].label}: ${val}`));
-            rect.addEventListener('focus', e => showTooltip(e, `${series[s].label}: ${val}`));
-            rect.addEventListener('mouseleave', hideTooltip);
-            rect.addEventListener('blur', hideTooltip);
-            barsGroup.appendChild(rect);
+        const render = () => {
+          const existingLegend = container.querySelector('.chart-legend');
+          container.innerHTML = '';
+          if (existingLegend) container.appendChild(existingLegend);
+          const width = container.clientWidth || 600;
+          const height = options.height || 240;
+          const padding = {top:24, right:12, bottom:48, left:44};
+          const innerW = width - padding.left - padding.right;
+          const innerH = height - padding.top - padding.bottom;
+
+          const cols = labels.length;
+          const isStacked = (options.stacked === true) || (width < 420 && series.length > 1);
+
+          // calcular máximo
+          let maxVal = 0;
+          if (isStacked) {
+            for (let i=0;i<cols;i++) {
+              const sum = series.reduce((acc, s) => acc + ((s.values[i] || 0) * (s.visible ? 1 : 0)), 0);
+              if (sum > maxVal) maxVal = sum;
+            }
+          } else {
+            for (const s of series) {
+              for (const v of s.values) if ((s.visible ?? true) && v > maxVal) maxVal = v;
+            }
           }
-          const tx = document.createElementNS(svgNS,'text');
-          tx.setAttribute('x', xBase + bandWidth/2);
-          tx.setAttribute('y', padding.top + innerH + 16);
-          tx.setAttribute('text-anchor','middle');
-          tx.setAttribute('fill','var(--muted)');
-          tx.setAttribute('font-size','12');
-          tx.textContent = labels[i];
-          svg.appendChild(tx);
-        }
-        svg.appendChild(barsGroup);
 
+          const svg = document.createElementNS(svgNS, 'svg');
+          svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+          svg.setAttribute('width', '100%');
+          svg.setAttribute('height', height);
+
+          // grid
+          const grid = document.createElementNS(svgNS, 'g');
+          const lines = 4;
+          for (let i=0;i<=lines;i++){
+            const y = padding.top + (innerH * i / lines);
+            const line = document.createElementNS(svgNS,'line');
+            line.setAttribute('x1', padding.left);
+            line.setAttribute('x2', padding.left + innerW);
+            line.setAttribute('y1', y);
+            line.setAttribute('y2', y);
+            line.setAttribute('stroke', 'var(--muted)');
+            line.setAttribute('stroke-width', '1');
+            grid.appendChild(line);
+          }
+          svg.appendChild(grid);
+
+          const bandWidth = innerW / Math.max(1, cols);
+          const barGap = Math.max(6, Math.floor(bandWidth * 0.08));
+          const barWidth = Math.max(8, Math.floor((bandWidth - barGap*2) / Math.max(1, series.length)));
+
+          const barsGroup = document.createElementNS(svgNS,'g');
+
+          for (let i=0;i<cols;i++){
+            const xBase = padding.left + i * bandWidth;
+            if (isStacked) {
+              let cum = 0;
+              for (let sIndex = 0; sIndex < localSeries.length; sIndex++){
+                const s = localSeries[sIndex];
+                if (!s.visible) continue;
+                const val = s.values[i] || 0;
+                const h = maxVal === 0 ? 0 : (val / maxVal) * innerH;
+                const y = padding.top + (innerH - (cum + h));
+                const rect = document.createElementNS(svgNS,'rect');
+                rect.setAttribute('x', xBase + barGap);
+                rect.setAttribute('y', y);
+                rect.setAttribute('width', Math.max(0, bandWidth - barGap*2));
+                rect.setAttribute('height', Math.max(0, h));
+                rect.setAttribute('fill', s.color);
+                rect.setAttribute('role','img');
+                rect.setAttribute('tabindex','0');
+                rect.setAttribute('aria-label', `${labels[i]}: ${s.label}: ${val}`);
+                // animation: fade/translate
+                rect.style.opacity = '0';
+                rect.style.transform = 'translateY(8px)';
+                rect.style.transition = 'transform 560ms cubic-bezier(.2,.9,.2,1), opacity 420ms ease';
+                rect.addEventListener('mouseenter', e => showTooltip(e, `${s.label}: ${val}`));
+                rect.addEventListener('focus', e => showTooltip(e, `${s.label}: ${val}`));
+                rect.addEventListener('mouseleave', hideTooltip);
+                rect.addEventListener('blur', hideTooltip);
+                barsGroup.appendChild(rect);
+                // trigger animation
+                requestAnimationFrame(() => { rect.style.opacity = '1'; rect.style.transform = 'translateY(0)'; });
+                cum += h;
+              }
+            } else {
+              let visibleIdx = 0;
+              for (let sIndex = 0; sIndex < localSeries.length; sIndex++){
+                const s = localSeries[sIndex];
+                if (!s.visible) continue;
+                const val = s.values[i] || 0;
+                const h = maxVal === 0 ? 0 : (val / maxVal) * innerH;
+                const x = xBase + barGap + visibleIdx * barWidth;
+                const y = padding.top + (innerH - h);
+                const rect = document.createElementNS(svgNS,'rect');
+                rect.setAttribute('x', x);
+                rect.setAttribute('y', y);
+                rect.setAttribute('width', Math.max(0, barWidth - 1));
+                rect.setAttribute('height', Math.max(0, h));
+                rect.setAttribute('fill', s.color);
+                rect.setAttribute('role','img');
+                rect.setAttribute('tabindex','0');
+                rect.setAttribute('aria-label', `${labels[i]}: ${s.label}: ${val}`);
+                rect.style.opacity = '0';
+                rect.style.transform = 'translateY(8px)';
+                rect.style.transition = 'transform 560ms cubic-bezier(.2,.9,.2,1), opacity 420ms ease';
+                rect.addEventListener('mouseenter', e => showTooltip(e, `${s.label}: ${val}`));
+                rect.addEventListener('focus', e => showTooltip(e, `${s.label}: ${val}`));
+                rect.addEventListener('mouseleave', hideTooltip);
+                rect.addEventListener('blur', hideTooltip);
+                barsGroup.appendChild(rect);
+                requestAnimationFrame(() => { rect.style.opacity = '1'; rect.style.transform = 'translateY(0)'; });
+                visibleIdx++;
+              }
+            }
+            const tx = document.createElementNS(svgNS,'text');
+            tx.setAttribute('x', xBase + bandWidth/2);
+            tx.setAttribute('y', padding.top + innerH + 18);
+            tx.setAttribute('text-anchor','middle');
+            tx.setAttribute('fill','var(--muted)');
+            tx.setAttribute('font-size','12');
+            tx.textContent = labels[i];
+            svg.appendChild(tx);
+          }
+          svg.appendChild(barsGroup);
+
+          container.appendChild(svg);
+        };
+
+        // legend + download
+        const legendWrap = document.createElement('div');
+        legendWrap.style.display = 'flex';
+        legendWrap.style.alignItems = 'center';
+        legendWrap.style.justifyContent = 'space-between';
+        legendWrap.style.marginBottom = '8px';
+
+        const legend = document.createElement('div');
+        legend.className = 'chart-legend';
+        legend.style.display = 'flex';
+        legend.style.gap = '12px';
+        legend.style.alignItems = 'center';
+        series.forEach((s, idx) => {
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'legend-item';
+          item.style.display = 'inline-flex';
+          item.style.alignItems = 'center';
+          item.style.gap = '8px';
+          item.style.border = '1px solid transparent';
+          item.style.background = 'transparent';
+          item.style.cursor = 'pointer';
+          item.style.padding = '6px 8px';
+          item.style.borderRadius = '8px';
+          item.setAttribute('aria-pressed', (s.visible ?? true) ? 'true' : 'false');
+          const dot = document.createElement('span');
+          dot.style.width = '12px';
+          dot.style.height = '12px';
+          dot.style.borderRadius = '50%';
+          dot.style.background = (s.color || ((colors && colors[idx]) || 'var(--brand)'));
+          const label = document.createElement('span');
+          label.textContent = s.label || s.key || `Série ${idx+1}`;
+          label.style.fontWeight = '600';
+          label.style.color = 'var(--text)';
+          item.appendChild(dot);
+          item.appendChild(label);
+          item.addEventListener('click', () => {
+            s.visible = !s.visible;
+            item.setAttribute('aria-pressed', s.visible ? 'true' : 'false');
+            render();
+          });
+          legend.appendChild(item);
+        });
+
+        const controls = document.createElement('div');
+        controls.style.display = 'flex';
+        controls.style.gap = '8px';
+
+        const downloadBtn = document.createElement('button');
+        downloadBtn.type = 'button';
+        downloadBtn.textContent = 'Download PNG';
+        downloadBtn.style.padding = '6px 10px';
+        downloadBtn.style.borderRadius = '8px';
+        downloadBtn.style.border = '1px solid var(--panel-border)';
+        downloadBtn.style.background = 'var(--panel)';
+        downloadBtn.style.cursor = 'pointer';
+        downloadBtn.addEventListener('click', () => {
+          const svgEl = container.querySelector('svg');
+          if (!svgEl) return;
+          const serializer = new XMLSerializer();
+          const svgStr = serializer.serializeToString(svgEl);
+          const img = new Image();
+          const blob = new Blob([svgStr], {type: 'image/svg+xml;charset=utf-8'});
+          const url = URL.createObjectURL(blob);
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width || svgEl.viewBox.baseVal.width || 800;
+            canvas.height = img.height || svgEl.viewBox.baseVal.height || 400;
+            const ctx = canvas.getContext('2d');
+            // white background
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0,0,canvas.width,canvas.height);
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(url);
+            canvas.toBlob((blobPng) => {
+              const link = document.createElement('a');
+              link.href = URL.createObjectURL(blobPng);
+              link.download = 'evolucao-mensal.png';
+              document.body.appendChild(link);
+              link.click();
+              link.remove();
+            }, 'image/png');
+          };
+          img.onerror = () => { URL.revokeObjectURL(url); alert('Falha ao gerar imagem.'); };
+          img.src = url;
+        });
+
+        controls.appendChild(downloadBtn);
+        legendWrap.appendChild(legend);
+        legendWrap.appendChild(controls);
+        container.appendChild(legendWrap);
+
+        // tooltip element shared
         const tooltip = document.createElement('div');
         tooltip.className = 'chart-tooltip';
         container.style.position = 'relative';
-        container.appendChild(svg);
         container.appendChild(tooltip);
 
         function showTooltip(e, text){
@@ -606,6 +775,13 @@ def dashboard_page() -> str:
           tooltip.style.top = (e.clientY - rect.top - 28) + 'px';
         }
         function hideTooltip(){ tooltip.style.display = 'none'; }
+
+        render();
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(render, 150);
+        });
       } catch(err) {
         container.innerHTML = `<div class="muted">Erro ao renderizar gráfico.</div>`;
         console.error(err);
