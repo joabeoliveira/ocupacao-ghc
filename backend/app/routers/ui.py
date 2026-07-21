@@ -1040,35 +1040,6 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
           </div>
         </section>
 
-        <section class="section">
-          <div class="section-header">
-            <div>
-              <h2>Histórico EGAA por prontuário</h2>
-              <p>Consulta rápida para ver as atuações registradas no paciente.</p>
-            </div>
-          </div>
-          <div class="section-body">
-            <div class="filters-grid" style="grid-template-columns: 1.2fr 1fr auto;">
-              <div class="field" style="margin-bottom:0;">
-                <label for="histProntuario">Prontuário</label>
-                <input id="histProntuario" placeholder="Digite um prontuário" />
-              </div>
-              <div class="field" style="margin-bottom:0;">
-                <label for="histTipo">Tipo</label>
-                <select id="histTipo">
-                  <option value="">Todos</option>
-                </select>
-              </div>
-              <div class="field" style="margin-bottom:0; align-self:end;">
-                <button id="histBuscar" type="button">Buscar histórico</button>
-              </div>
-            </div>
-            <p id="histResumo" class="muted" style="margin: 12px 0 0;">Informe um prontuário para consultar as atuações do EGAA.</p>
-            <div class="chart-list" id="histRows" style="margin-top: 12px;">
-              <div class="muted">Nenhuma consulta realizada.</div>
-            </div>
-          </div>
-        </section>
       </div>
     </main>
   <!-- ── Modal de detalhe do paciente ── -->
