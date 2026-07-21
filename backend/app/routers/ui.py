@@ -541,9 +541,9 @@ def dashboard_page() -> str:
         const localSeries = (series || []).map((s, i) => ({ ...s, visible: typeof s.visible === 'boolean' ? s.visible : true, color: getSeriesColor((s.key || s.label || '').toString().toLowerCase(), i, s.color) }));
 
         const render = () => {
-          const existingLegend = container.querySelector('.chart-legend');
+          const existingWrap = container.querySelector('.chart-legend-wrap');
           container.innerHTML = '';
-          if (existingLegend) container.appendChild(existingLegend);
+          if (existingWrap) container.appendChild(existingWrap);
           const width = container.clientWidth || 600;
           const height = options.height || 240;
           const padding = {top:24, right:12, bottom:48, left:44};
@@ -671,6 +671,7 @@ def dashboard_page() -> str:
 
         // legend + download
         const legendWrap = document.createElement('div');
+        legendWrap.className = 'chart-legend-wrap';
         legendWrap.style.display = 'flex';
         legendWrap.style.alignItems = 'center';
         legendWrap.style.justifyContent = 'space-between';
@@ -720,6 +721,7 @@ def dashboard_page() -> str:
         const downloadBtn = document.createElement('button');
         downloadBtn.type = 'button';
         downloadBtn.textContent = 'Download PNG';
+        downloadBtn.title = 'Baixar gráfico como PNG';
         downloadBtn.style.padding = '6px 10px';
         downloadBtn.style.borderRadius = '8px';
         downloadBtn.style.border = '1px solid var(--panel-border)';
