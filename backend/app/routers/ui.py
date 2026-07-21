@@ -625,6 +625,24 @@ def dashboard_page() -> str:
                 // trigger animation
                 requestAnimationFrame(() => { rect.style.opacity = '1'; rect.style.transform = 'translateY(0)'; });
                 cum += h;
+                // mostrar valor na própria barra (ajusta cor se barra for pequena)
+                try {
+                  const txt = document.createElementNS(svgNS,'text');
+                  const w = Math.max(0, bandWidth - barGap*2);
+                  const cx = xBase + barGap + w/2;
+                  const yInside = y + Math.min(14, Math.max(8, h - 4));
+                  const small = h < 18;
+                  const yText = small ? (y - 4) : yInside;
+                  txt.setAttribute('x', cx);
+                  txt.setAttribute('y', yText);
+                  txt.setAttribute('text-anchor','middle');
+                  txt.setAttribute('fill', small ? 'var(--text)' : '#ffffff');
+                  txt.setAttribute('font-size','12');
+                  txt.setAttribute('font-weight','700');
+                  txt.style.pointerEvents = 'none';
+                  txt.textContent = new Intl.NumberFormat('pt-BR').format(Number(val || 0));
+                  barsGroup.appendChild(txt);
+                } catch(e) {/* ignore */}
               }
             } else {
               let visibleIdx = 0;
@@ -655,6 +673,24 @@ def dashboard_page() -> str:
                 barsGroup.appendChild(rect);
                 requestAnimationFrame(() => { rect.style.opacity = '1'; rect.style.transform = 'translateY(0)'; });
                 visibleIdx++;
+                // mostrar valor na própria barra (ajusta cor se barra for pequena)
+                try {
+                  const txt = document.createElementNS(svgNS,'text');
+                  const w = Math.max(0, barWidth - 1);
+                  const cx = x + w/2;
+                  const yInside = y + Math.min(14, Math.max(8, h - 4));
+                  const small = h < 18;
+                  const yText = small ? (y - 4) : yInside;
+                  txt.setAttribute('x', cx);
+                  txt.setAttribute('y', yText);
+                  txt.setAttribute('text-anchor','middle');
+                  txt.setAttribute('fill', small ? 'var(--text)' : '#ffffff');
+                  txt.setAttribute('font-size','12');
+                  txt.setAttribute('font-weight','700');
+                  txt.style.pointerEvents = 'none';
+                  txt.textContent = new Intl.NumberFormat('pt-BR').format(Number(val || 0));
+                  barsGroup.appendChild(txt);
+                } catch(e) {/* ignore */}
               }
             }
             const tx = document.createElementNS(svgNS,'text');
