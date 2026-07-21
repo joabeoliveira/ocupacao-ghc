@@ -316,6 +316,7 @@ def dashboard_page() -> str:
     .pie-dot { width:10px; height:10px; border-radius:50%; flex: 0 0 10px; }
     .pie-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font-weight:600; }
     .pie-value { color:var(--brand); font-weight:700; white-space:nowrap; }
+    .chart-tooltip { position: absolute; background: rgba(0,0,0,0.8); color: #fff; padding:6px 8px; border-radius:4px; font-size:12px; pointer-events:none; display:none; z-index:50; }
     @media (max-width: 1100px) {
       .layout { grid-template-columns: 1fr; }
       .sidebar { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--panel-border); }
@@ -520,6 +521,97 @@ def dashboard_page() -> str:
       container.innerHTML = `<div class="pie-chart" aria-hidden="true" style="background:conic-gradient(${gradient});"></div><div class="pie-legend">${legend}</div>`;
     }
 
+    function renderColumnChart(container, {labels, series, colors, options={}}) {
+      container.innerHTML = '';
+      try {
+        const width = container.clientWidth || 600;
+        const height = options.height || 220;
+        const padding = {top:20, right:12, bottom:40, left:40};
+        const innerW = width - padding.left - padding.right;
+        const innerH = height - padding.top - padding.bottom;
+        const maxVal = Math.max(...series.flatMap(s => s.values));
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(svgNS, 'svg');
+        svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        svg.setAttribute('width', '100%');
+        svg.setAttribute('height', height);
+
+        // grid
+        const grid = document.createElementNS(svgNS, 'g');
+        const lines = 4;
+        for (let i=0;i<=lines;i++){
+          const y = padding.top + (innerH * i / lines);
+          const line = document.createElementNS(svgNS,'line');
+          line.setAttribute('x1', padding.left);
+          line.setAttribute('x2', padding.left + innerW);
+          line.setAttribute('y1', y);
+          line.setAttribute('y2', y);
+          line.setAttribute('stroke', 'var(--muted)');
+          line.setAttribute('stroke-width', '1');
+          grid.appendChild(line);
+        }
+        svg.appendChild(grid);
+
+        const cols = labels.length;
+        const seriesCount = series.length || 1;
+        const bandWidth = innerW / Math.max(1, cols);
+        const barGap = Math.max(4, Math.floor(bandWidth * 0.08));
+        const barWidth = Math.max(6, Math.floor((bandWidth - barGap*2) / seriesCount));
+
+        const barsGroup = document.createElementNS(svgNS,'g');
+        for (let i=0;i<cols;i++){
+          const xBase = padding.left + i * bandWidth;
+          for (let s=0;s<seriesCount;s++){
+            const val = series[s].values[i] || 0;
+            const h = maxVal === 0 ? 0 : (val / maxVal) * innerH;
+            const x = xBase + barGap + s * barWidth;
+            const y = padding.top + (innerH - h);
+            const rect = document.createElementNS(svgNS,'rect');
+            rect.setAttribute('x', x);
+            rect.setAttribute('y', y);
+            rect.setAttribute('width', Math.max(0, barWidth - 1));
+            rect.setAttribute('height', Math.max(0, h));
+            rect.setAttribute('fill', (colors && colors[s]) || 'var(--brand)');
+            rect.setAttribute('role','img');
+            rect.setAttribute('tabindex','0');
+            rect.setAttribute('aria-label', `${labels[i]}: ${series[s].label}: ${val}`);
+            rect.addEventListener('mouseenter', e => showTooltip(e, `${series[s].label}: ${val}`));
+            rect.addEventListener('focus', e => showTooltip(e, `${series[s].label}: ${val}`));
+            rect.addEventListener('mouseleave', hideTooltip);
+            rect.addEventListener('blur', hideTooltip);
+            barsGroup.appendChild(rect);
+          }
+          const tx = document.createElementNS(svgNS,'text');
+          tx.setAttribute('x', xBase + bandWidth/2);
+          tx.setAttribute('y', padding.top + innerH + 16);
+          tx.setAttribute('text-anchor','middle');
+          tx.setAttribute('fill','var(--muted)');
+          tx.setAttribute('font-size','12');
+          tx.textContent = labels[i];
+          svg.appendChild(tx);
+        }
+        svg.appendChild(barsGroup);
+
+        const tooltip = document.createElement('div');
+        tooltip.className = 'chart-tooltip';
+        container.style.position = 'relative';
+        container.appendChild(svg);
+        container.appendChild(tooltip);
+
+        function showTooltip(e, text){
+          tooltip.textContent = text;
+          tooltip.style.display = 'block';
+          const rect = container.getBoundingClientRect();
+          tooltip.style.left = (e.clientX - rect.left + 8) + 'px';
+          tooltip.style.top = (e.clientY - rect.top - 28) + 'px';
+        }
+        function hideTooltip(){ tooltip.style.display = 'none'; }
+      } catch(err) {
+        container.innerHTML = `<div class="muted">Erro ao renderizar gráfico.</div>`;
+        console.error(err);
+      }
+    }
+
     async function loadKPIs() {
       const params = new URLSearchParams();
       if (dataInicioEl.value) params.set('data_inicio', dataInicioEl.value);
@@ -571,14 +663,19 @@ def dashboard_page() -> str:
         <div class="card"><span class="badge badge-success">Concluídas</span><strong>Fechadas</strong><div class="kpi-value">${data.concluidas}</div></div>
       `;
       renderPieChart(egaaStatusChartEl, porStatus, 'Nenhum status para exibir.');
-      egaaMesChartEl.innerHTML = porMes.length
-        ? porMes.map(item => `
-            <div class="chart-row">
-              <div class="chart-name" title="${item.mes || '--'}">${item.mes || '--'}</div>
-              <div class="chart-track" aria-hidden="true"><div class="chart-fill" style="width:${Math.max(6, Math.round(((item.total || 0) / (porMes.reduce((acc, cur) => Math.max(acc, cur.total || 0), 0) || 1)) * 100))}%"></div></div>
-              <div class="chart-value">${item.total}</div>
-            </div>`).join('')
-        : '<div class="muted">Nenhuma evolução mensal para exibir.</div>';
+      if (Array.isArray(porMes) && porMes.length) {
+        const labels = porMes.map(item => item.mes || '--');
+        const values = porMes.map(item => Number(item.total || 0));
+        // series supports multiple series; here we use a single series named 'Intervenções'
+        renderColumnChart(egaaMesChartEl, {
+          labels,
+          series: [{ key: 'intervencoes', label: 'Intervenções', values }],
+          colors: ['var(--brand)'],
+          options: { height: 220 }
+        });
+      } else {
+        egaaMesChartEl.innerHTML = '<div class="muted">Nenhuma evolução mensal para exibir.</div>';
+      }
     }
 
     filtrarBtn.addEventListener('click', () => { loadKPIs(); loadEgaaIndicadores(); });

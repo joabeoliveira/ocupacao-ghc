@@ -1,5 +1,12 @@
 # Contexto do Projeto: Painel de Regulação e Censo (EGAA)
 
+## Leitura obrigatória para LLMs
+
+Antes de executar qualquer tarefa, leia este arquivo e também o `CONTEXT_LLM_MVP.md`.
+
+- Este arquivo (`CONTEXT_AI.md`) define contexto de negócio, regras e estado funcional validado.
+- O `CONTEXT_LLM_MVP.md` define mapa estrutural/arquitetural do código e estratégia de alteração com baixo risco.
+
 Este documento é a fonte de verdade para qualquer agente (humanos ou LLMs) que precise compreender, desenvolver ou operar o MVP de ocupação hospitalar (EGAA). Contém visão de negócio, arquitetura, pontos de integração, convenções e passos práticos para reprodução local, deploy e troubleshooting.
 
 ## Atualização 2026-06-30 (estado atual validado)
