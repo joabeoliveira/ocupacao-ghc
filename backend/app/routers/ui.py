@@ -616,8 +616,9 @@ def dashboard_page() -> str:
                 rect.style.opacity = '0';
                 rect.style.transform = 'translateY(8px)';
                 rect.style.transition = 'transform 560ms cubic-bezier(.2,.9,.2,1), opacity 420ms ease';
-                rect.addEventListener('mouseenter', e => showTooltip(e, `${s.label}: ${val}`));
-                rect.addEventListener('focus', e => showTooltip(e, `${s.label}: ${val}`));
+                const fmt = (v) => new Intl.NumberFormat('pt-BR').format(Number(v || 0));
+                rect.addEventListener('mouseenter', e => showTooltip(e, `${s.label}: ${fmt(val)}`));
+                rect.addEventListener('focus', e => showTooltip(e, `${s.label}: ${fmt(val)}`));
                 rect.addEventListener('mouseleave', hideTooltip);
                 rect.addEventListener('blur', hideTooltip);
                 barsGroup.appendChild(rect);
@@ -646,8 +647,9 @@ def dashboard_page() -> str:
                 rect.style.opacity = '0';
                 rect.style.transform = 'translateY(8px)';
                 rect.style.transition = 'transform 560ms cubic-bezier(.2,.9,.2,1), opacity 420ms ease';
-                rect.addEventListener('mouseenter', e => showTooltip(e, `${s.label}: ${val}`));
-                rect.addEventListener('focus', e => showTooltip(e, `${s.label}: ${val}`));
+                const fmt2 = (v) => new Intl.NumberFormat('pt-BR').format(Number(v || 0));
+                rect.addEventListener('mouseenter', e => showTooltip(e, `${s.label}: ${fmt2(val)}`));
+                rect.addEventListener('focus', e => showTooltip(e, `${s.label}: ${fmt2(val)}`));
                 rect.addEventListener('mouseleave', hideTooltip);
                 rect.addEventListener('blur', hideTooltip);
                 barsGroup.appendChild(rect);
@@ -727,23 +729,31 @@ def dashboard_page() -> str:
         downloadBtn.style.border = '1px solid var(--panel-border)';
         downloadBtn.style.background = 'var(--panel)';
         downloadBtn.style.cursor = 'pointer';
+        downloadBtn.style.color = 'var(--brand)';
         downloadBtn.addEventListener('click', () => {
           const svgEl = container.querySelector('svg');
           if (!svgEl) return;
+          // serializar SVG e substituir variáveis CSS por valores computados
           const serializer = new XMLSerializer();
-          const svgStr = serializer.serializeToString(svgEl);
-          const img = new Image();
+          let svgStr = serializer.serializeToString(svgEl);
+          const styles = getComputedStyle(document.documentElement);
+          svgStr = svgStr.replace(/var\\((--[a-zA-Z0-9\\-]+)\\)/g, (m, varName) => {
+            const val = styles.getPropertyValue(varName).trim();
+            return val || m;
+          });
           const blob = new Blob([svgStr], {type: 'image/svg+xml;charset=utf-8'});
           const url = URL.createObjectURL(blob);
+          const img = new Image();
           img.onload = () => {
             const canvas = document.createElement('canvas');
-            canvas.width = img.width || svgEl.viewBox.baseVal.width || 800;
-            canvas.height = img.height || svgEl.viewBox.baseVal.height || 400;
+            // tentar usar viewBox se disponível
+            const vb = svgEl.viewBox && svgEl.viewBox.baseVal ? svgEl.viewBox.baseVal : null;
+            canvas.width = vb ? vb.width : (img.width || 800);
+            canvas.height = vb ? vb.height : (img.height || 400);
             const ctx = canvas.getContext('2d');
-            // white background
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0,0,canvas.width,canvas.height);
-            ctx.drawImage(img, 0, 0);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             URL.revokeObjectURL(url);
             canvas.toBlob((blobPng) => {
               const link = document.createElement('a');
@@ -772,9 +782,21 @@ def dashboard_page() -> str:
         function showTooltip(e, text){
           tooltip.textContent = text;
           tooltip.style.display = 'block';
-          const rect = container.getBoundingClientRect();
-          tooltip.style.left = (e.clientX - rect.left + 8) + 'px';
-          tooltip.style.top = (e.clientY - rect.top - 28) + 'px';
+          const containerRect = container.getBoundingClientRect();
+          // suportar mouse events e focus events
+          if (typeof e.clientX === 'number') {
+            tooltip.style.left = (e.clientX - containerRect.left + 8) + 'px';
+            tooltip.style.top = (e.clientY - containerRect.top - 28) + 'px';
+          } else {
+            const target = e.target || e.srcElement;
+            if (target && target.getBoundingClientRect) {
+              const r = target.getBoundingClientRect();
+              const left = r.left + r.width / 2 - containerRect.left;
+              const top = r.top - containerRect.top - 28;
+              tooltip.style.left = left + 'px';
+              tooltip.style.top = top + 'px';
+            }
+          }
         }
         function hideTooltip(){ tooltip.style.display = 'none'; }
 
