@@ -42,7 +42,6 @@ def upload_page() -> str:
 <body>
   <div class="top-nav" style="max-width:720px;margin:0 auto 12px;display:flex;gap:8px;">
     <a href="/dashboard" style="text-decoration:none;padding:8px 12px;border-radius:8px;background:#fff;border:1px solid #DCE3EA;color:var(--brand);font-weight:600;">Dashboard</a>
-    <a href="/pacientes" style="text-decoration:none;padding:8px 12px;border-radius:8px;background:#fff;border:1px solid #DCE3EA;color:var(--brand);font-weight:600;">Pacientes</a>
     <a href="/longa-permanencia" style="text-decoration:none;padding:8px 12px;border-radius:8px;background:#fff;border:1px solid #DCE3EA;color:var(--brand);font-weight:600;">Longa Permanência</a>
     <a href="/desfechos" style="text-decoration:none;padding:8px 12px;border-radius:8px;background:#fff;border:1px solid #DCE3EA;color:var(--brand);font-weight:600;">Desfechos EGAA</a>
     <a href="/configuracoes" style="text-decoration:none;padding:8px 12px;border-radius:8px;background:#fff;border:1px solid #DCE3EA;color:var(--brand);font-weight:600;">Configurações</a>
@@ -302,7 +301,21 @@ def dashboard_page() -> str:
     .chart-track { height: 14px; background: #edf2f7; border-radius: 999px; overflow:hidden; }
     .chart-fill { height: 100%; background: linear-gradient(90deg, var(--brand), var(--secondary)); border-radius: 999px; }
     .chart-value { text-align:right; color: var(--brand); font-weight: 700; font-size: 13px; }
-    .patient-section { margin-top: 18px; }
+    .pie-wrapper { display:flex; gap:16px; align-items:center; flex-wrap:wrap; padding-top: 8px; }
+    .pie-chart {
+      width: 168px;
+      height: 168px;
+      border-radius: 50%;
+      border: 1px solid #e5ecf3;
+      background: #f4f7fb;
+      flex: 0 0 auto;
+    }
+    .pie-legend { display:flex; flex-direction:column; gap:8px; min-width: 220px; flex: 1; }
+    .pie-legend-item { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:13px; }
+    .pie-legend-label { display:flex; align-items:center; gap:8px; min-width: 0; }
+    .pie-dot { width:10px; height:10px; border-radius:50%; flex: 0 0 10px; }
+    .pie-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font-weight:600; }
+    .pie-value { color:var(--brand); font-weight:700; white-space:nowrap; }
     @media (max-width: 1100px) {
       .layout { grid-template-columns: 1fr; }
       .sidebar { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--panel-border); }
@@ -329,7 +342,6 @@ def dashboard_page() -> str:
       <p class="brand-subtitle">Administração</p>
       <nav class="nav">
         <a class="primary" href="/dashboard">Dashboard</a>
-        <a href="/pacientes">Pacientes</a>
         <a href="/longa-permanencia">Longa Permanência</a>
         <a href="/desfechos">Desfechos EGAA</a>
         <a href="/configuracoes">Configurações</a>
@@ -347,7 +359,7 @@ def dashboard_page() -> str:
         <div class="header">
           <div>
             <h1>Dashboard</h1>
-            <p class="subtitle">Visão rápida dos internados, da concentração por unidade e da lista filtrável de pacientes.</p>
+            <p class="subtitle">Visão rápida da ocupação, concentração por unidade e resultados do EGAA.</p>
           </div>
           <div class="header-actions">
             <a class="pill-link" href="/upload">Ir para Upload</a>
@@ -382,15 +394,6 @@ def dashboard_page() -> str:
               <label for="dataFim">Data final</label>
               <input id="dataFim" type="date" />
             </div>
-            <div class="field">
-              <label for="pageSizeSelect">Itens por página</label>
-              <select id="pageSizeSelect">
-                <option value="5">5</option>
-                <option value="10" selected>10</option>
-                <option value="20">20</option>
-                <option value="50">50</option>
-              </select>
-            </div>
           </div>
           <div class="actions" style="margin-top: 12px;">
             <button id="filtrar">Aplicar filtros</button>
@@ -401,21 +404,6 @@ def dashboard_page() -> str:
         <div class="cards" id="kpis">
           <div class="card">Carregando...</div>
         </div>
-
-        <section class="section" style="margin-top:16px;">
-          <div class="section-header">
-            <div>
-              <h2>Longa permanência em foco</h2>
-              <p id="longaResumo" class="muted">Aguardando dados...</p>
-            </div>
-            <a class="pill-link" href="/longa-permanencia">Abrir página dedicada</a>
-          </div>
-          <div class="section-body">
-            <div class="chart-list" id="longaChart">
-              <div class="muted">Aguardando dados...</div>
-            </div>
-          </div>
-        </section>
 
         <section class="section">
           <div class="section-header">
@@ -431,13 +419,7 @@ def dashboard_page() -> str:
             <div class="grid" style="margin-top:16px;">
               <div class="card">
                 <strong>Intervenções por status</strong>
-                <div class="chart-list" id="egaaStatusChart">
-                  <div class="muted">Aguardando dados...</div>
-                </div>
-              </div>
-              <div class="card">
-                <strong>Intervenções por tipo</strong>
-                <div class="chart-list" id="egaaTipoChart">
+                <div class="pie-wrapper" id="egaaStatusChart">
                   <div class="muted">Aguardando dados...</div>
                 </div>
               </div>
@@ -459,34 +441,8 @@ def dashboard_page() -> str:
             </div>
           </div>
           <div class="section-body">
-            <div class="chart-list" id="unidadesChart">
+            <div class="pie-wrapper" id="unidadesChart">
               <div class="muted">Aguardando dados...</div>
-            </div>
-          </div>
-        </section>
-
-        <section class="patient-section" id="pacientes">
-          <div class="section-title">
-            <div>
-              <h2>Pacientes internados</h2>
-              <p>Lista filtrável ordenada por tempo de internação.</p>
-            </div>
-            <p class="muted" id="pageInfo">Página 1</p>
-          </div>
-
-          <div class="section">
-            <div class="section-body">
-              <table aria-live="polite">
-                <thead>
-                  <tr><th>Prontuario</th><th>Nome</th><th>Idade</th><th>Dias</th><th>Especialidade</th><th>Unidade</th></tr>
-                </thead>
-                <tbody id="rows">
-                </tbody>
-              </table>
-              <div style="margin-top:12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                <button id="prev">Anterior</button>
-                <button id="next">Próxima</button>
-              </div>
             </div>
           </div>
         </section>
@@ -497,16 +453,12 @@ def dashboard_page() -> str:
   <script>
     const API_PREFIX = '/api';
     const kpisEl = document.getElementById('kpis');
-    const longaChartEl = document.getElementById('longaChart');
-    const longaResumoEl = document.getElementById('longaResumo');
     const egaaResumoEl = document.getElementById('egaaResumo');
     const egaaKpisEl = document.getElementById('egaaKpis');
     const egaaStatusChartEl = document.getElementById('egaaStatusChart');
-    const egaaTipoChartEl = document.getElementById('egaaTipoChart');
     const egaaMesChartEl = document.getElementById('egaaMesChart');
     const unidadesChartEl = document.getElementById('unidadesChart');
     const unidadesResumoEl = document.getElementById('unidadesResumo');
-    const rowsEl = document.getElementById('rows');
     const prontuarioEl = document.getElementById('prontuario');
     const nomeEl = document.getElementById('nome');
     const especialidadeEl = document.getElementById('especialidade');
@@ -514,11 +466,59 @@ def dashboard_page() -> str:
     const dataInicioEl = document.getElementById('dataInicio');
     const dataFimEl = document.getElementById('dataFim');
     const filtrarBtn = document.getElementById('filtrar');
-    const prevBtn = document.getElementById('prev');
-    const nextBtn = document.getElementById('next');
-    const pageInfo = document.getElementById('pageInfo');
 
-    let page = 1; let pageSize = parseInt(document.getElementById('pageSizeSelect').value, 10) || 10;
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      }[character] || character));
+    }
+
+    function normalizePieLabel(item) {
+      if (item && typeof item.status === 'string' && item.status) return item.status;
+      if (item && typeof item.unidade === 'string' && item.unidade) return item.unidade;
+      if (item && typeof item.label === 'string' && item.label) return item.label;
+      return '--';
+    }
+
+    function normalizePieValue(item) {
+      if (!item || typeof item !== 'object') return 0;
+      return Number(item.total ?? item.total_pacientes ?? item.value ?? 0) || 0;
+    }
+
+    function renderPieChart(container, items, emptyMessage) {
+      if (!Array.isArray(items) || !items.length) {
+        container.innerHTML = `<div class="muted">${emptyMessage}</div>`;
+        return;
+      }
+      const total = items.reduce((acc, item) => acc + normalizePieValue(item), 0);
+      if (!total) {
+        container.innerHTML = `<div class="muted">${emptyMessage}</div>`;
+        return;
+      }
+      const palette = ['#005C99', '#00A79D', '#F9A825', '#C62828', '#0288D1', '#2E7D32', '#6B7280'];
+      let cursor = 0;
+      const segments = items.map((item, index) => {
+        const value = normalizePieValue(item);
+        const percent = (value / total) * 100;
+        const start = cursor;
+        cursor += percent;
+        return { label: normalizePieLabel(item), value, start, end: cursor, color: palette[index % palette.length] };
+      });
+      const gradient = segments
+        .map((segment) => `${segment.color} ${segment.start.toFixed(2)}% ${segment.end.toFixed(2)}%`)
+        .join(', ');
+      const legend = segments
+        .map((segment) => {
+          const pct = ((segment.value / total) * 100).toFixed(1);
+          return `<div class="pie-legend-item"><div class="pie-legend-label"><span class="pie-dot" style="background:${segment.color}"></span><span class="pie-text" title="${escapeHtml(segment.label)}">${escapeHtml(segment.label)}</span></div><span class="pie-value">${segment.value} (${pct}%)</span></div>`;
+        })
+        .join('');
+      container.innerHTML = `<div class="pie-chart" aria-hidden="true" style="background:conic-gradient(${gradient});"></div><div class="pie-legend">${legend}</div>`;
+    }
 
     async function loadKPIs() {
       const params = new URLSearchParams();
@@ -532,7 +532,6 @@ def dashboard_page() -> str:
       const fmtPct = (value) => `${Number(value || 0).toFixed(2)}%`;
       const unidades = Array.isArray(data.ocupacao_por_unidade) ? data.ocupacao_por_unidade : [];
       const topUnidades = unidades.slice(0, 5);
-      const resto = Math.max(unidades.length - topUnidades.length, 0);
       kpisEl.innerHTML = `
         <div class="card"><span class="badge badge-info">Leitos</span><strong>Leitos ocupados</strong><div class="kpi-value">${data.leitos_ocupados}</div></div>
         <div class="card"><span class="badge badge-secondary">Leitos</span><strong>Leitos livres</strong><div class="kpi-value">${data.leitos_livres}</div></div>
@@ -547,46 +546,7 @@ def dashboard_page() -> str:
       unidadesResumoEl.textContent = unidades.length
         ? `Mostrando as ${topUnidades.length} unidades com mais pacientes de um total de ${unidades.length}.`
         : 'Nenhuma unidade retornada pela API.';
-      const longaParams = new URLSearchParams();
-      longaParams.set('min_dias', '15');
-      longaParams.set('page_size', '5');
-      if (dataInicioEl.value) longaParams.set('data_inicio', dataInicioEl.value);
-      if (dataFimEl.value) longaParams.set('data_fim', dataFimEl.value);
-      const longaRes = await fetch(`${API_PREFIX}/censo/pacientes?` + longaParams.toString());
-      if (longaRes.ok) {
-        const longaData = await longaRes.json();
-        const longaItems = Array.isArray(longaData.items) ? longaData.items : [];
-        longaResumoEl.textContent = longaItems.length
-          ? `Top ${longaItems.length} pacientes com 15+ dias de internação.`
-          : 'Nenhum paciente em longa permanência para exibir.';
-        longaChartEl.innerHTML = longaItems.length
-          ? longaItems.map(item => {
-              const dias = Number(item.dias_internacao || 0);
-              const width = Math.max(6, Math.min(100, dias * 3));
-              return `
-                <div class="chart-row">
-                  <div class="chart-name" title="${item.nome_paciente || '--'}">${item.nome_paciente || '--'}</div>
-                  <div class="chart-track" aria-hidden="true"><div class="chart-fill" style="width:${width}%"></div></div>
-                  <div class="chart-value">${dias}d</div>
-                </div>`;
-            }).join('')
-          : '<div class="muted">Nenhum paciente para exibir.</div>';
-      } else {
-        longaResumoEl.textContent = 'Falha ao carregar longa permanência.';
-        longaChartEl.innerHTML = '<div class="muted">Não foi possível carregar a longa permanência.</div>';
-      }
-      const maxValue = topUnidades.reduce((acc, item) => Math.max(acc, item.total_pacientes || 0), 0) || 1;
-      unidadesChartEl.innerHTML = topUnidades.length
-        ? topUnidades.map(u => {
-            const width = Math.max(6, Math.round(((u.total_pacientes || 0) / maxValue) * 100));
-            return `
-              <div class="chart-row">
-                <div class="chart-name" title="${u.unidade || '--'}">${u.unidade || '--'}</div>
-                <div class="chart-track" aria-hidden="true"><div class="chart-fill" style="width:${width}%"></div></div>
-                <div class="chart-value">${u.total_pacientes}</div>
-              </div>`;
-          }).join('')
-        : '<div class="muted">Nenhuma unidade para exibir.</div>';
+      renderPieChart(unidadesChartEl, topUnidades, 'Nenhuma unidade para exibir.');
     }
 
     async function loadEgaaIndicadores() {
@@ -595,13 +555,11 @@ def dashboard_page() -> str:
         egaaResumoEl.textContent = 'Não foi possível carregar os indicadores do EGAA.';
         egaaKpisEl.innerHTML = '<div class="card">Erro ao obter indicadores</div>';
         egaaStatusChartEl.innerHTML = '<div class="muted">Sem dados.</div>';
-        egaaTipoChartEl.innerHTML = '<div class="muted">Sem dados.</div>';
         egaaMesChartEl.innerHTML = '<div class="muted">Sem dados.</div>';
         return;
       }
       const data = await res.json();
       const porStatus = Array.isArray(data.por_status) ? data.por_status : [];
-      const porTipo = Array.isArray(data.por_tipo) ? data.por_tipo : [];
       const porMes = Array.isArray(data.por_mes) ? data.por_mes : [];
       egaaResumoEl.textContent = data.total_intervencoes
         ? `${data.total_intervencoes} intervenções registradas em ${data.pacientes_com_intervencao} pacientes distintos.`
@@ -612,30 +570,7 @@ def dashboard_page() -> str:
         <div class="card"><span class="badge badge-secondary">Em andamento</span><strong>Ativas</strong><div class="kpi-value">${data.em_andamento}</div></div>
         <div class="card"><span class="badge badge-success">Concluídas</span><strong>Fechadas</strong><div class="kpi-value">${data.concluidas}</div></div>
       `;
-      const statusMax = porStatus.reduce((acc, item) => Math.max(acc, item.total || 0), 0) || 1;
-      egaaStatusChartEl.innerHTML = porStatus.length
-        ? porStatus.map(item => {
-            const width = Math.max(6, Math.round(((item.total || 0) / statusMax) * 100));
-            return `
-              <div class="chart-row">
-                <div class="chart-name" title="${item.status || '--'}">${item.status || '--'}</div>
-                <div class="chart-track" aria-hidden="true"><div class="chart-fill" style="width:${width}%"></div></div>
-                <div class="chart-value">${item.total}</div>
-              </div>`;
-          }).join('')
-        : '<div class="muted">Nenhum status para exibir.</div>';
-      const tipoMax = porTipo.reduce((acc, item) => Math.max(acc, item.total || 0), 0) || 1;
-      egaaTipoChartEl.innerHTML = porTipo.length
-        ? porTipo.map(item => {
-            const width = Math.max(6, Math.round(((item.total || 0) / tipoMax) * 100));
-            return `
-              <div class="chart-row">
-                <div class="chart-name" title="${item.tipo_intervencao_nome || '--'}">${item.tipo_intervencao_nome || '--'}</div>
-                <div class="chart-track" aria-hidden="true"><div class="chart-fill" style="width:${width}%"></div></div>
-                <div class="chart-value">${item.total}</div>
-              </div>`;
-          }).join('')
-        : '<div class="muted">Nenhum tipo para exibir.</div>';
+      renderPieChart(egaaStatusChartEl, porStatus, 'Nenhum status para exibir.');
       egaaMesChartEl.innerHTML = porMes.length
         ? porMes.map(item => `
             <div class="chart-row">
@@ -646,34 +581,12 @@ def dashboard_page() -> str:
         : '<div class="muted">Nenhuma evolução mensal para exibir.</div>';
     }
 
-    async function loadPacientes() {
-      const params = new URLSearchParams();
-      params.set('page', page);
-      params.set('page_size', pageSize);
-      if (prontuarioEl.value) params.set('prontuario', prontuarioEl.value);
-      if (nomeEl.value) params.set('nome', nomeEl.value);
-      if (especialidadeEl.value) params.set('especialidade', especialidadeEl.value);
-      if (unidadeEl.value) params.set('unidade', unidadeEl.value);
-      if (dataInicioEl.value) params.set('data_inicio', dataInicioEl.value);
-      if (dataFimEl.value) params.set('data_fim', dataFimEl.value);
+    filtrarBtn.addEventListener('click', () => { loadKPIs(); loadEgaaIndicadores(); });
+    dataInicioEl.addEventListener('change', () => { loadKPIs(); });
+    dataFimEl.addEventListener('change', () => { loadKPIs(); });
+    document.getElementById('refresh').addEventListener('click', () => { loadKPIs(); loadEgaaIndicadores(); });
 
-      const res = await fetch(`${API_PREFIX}/censo/pacientes?` + params.toString());
-      if (!res.ok) return rowsEl.innerHTML = `<tr><td colspan="6">Erro ao obter pacientes (${res.status})</td></tr>`;
-      const data = await res.json();
-      rowsEl.innerHTML = data.items.map(it => `<tr><td>${it.prontuario}</td><td>${it.nome_paciente||''}</td><td>${it.idade_anos??''}</td><td>${it.dias_internacao??''}</td><td>${it.especialidade}</td><td>${it.unidade||''}</td></tr>`).join('');
-      pageInfo.textContent = `Página ${data.page} de ${Math.ceil(data.total / data.page_size) || 1}`;
-      prevBtn.disabled = data.page <= 1; nextBtn.disabled = data.page * data.page_size >= data.total;
-    }
-
-    filtrarBtn.addEventListener('click', () => { page = 1; pageSize = parseInt(document.getElementById('pageSizeSelect').value, 10) || 10; loadPacientes(); loadKPIs(); });
-    prevBtn.addEventListener('click', () => { if (page>1) page--; loadPacientes(); });
-    nextBtn.addEventListener('click', () => { page++; loadPacientes(); });
-    document.getElementById('pageSizeSelect').addEventListener('change', () => { page = 1; pageSize = parseInt(document.getElementById('pageSizeSelect').value, 10) || 10; loadPacientes(); });
-    dataInicioEl.addEventListener('change', () => { page = 1; loadPacientes(); loadKPIs(); });
-    dataFimEl.addEventListener('change', () => { page = 1; loadPacientes(); loadKPIs(); });
-    document.getElementById('refresh').addEventListener('click', () => { loadKPIs(); loadPacientes(); });
-
-    loadKPIs(); loadPacientes(); loadEgaaIndicadores();
+    loadKPIs(); loadEgaaIndicadores();
   </script>
 </body>
 </html>
@@ -715,7 +628,6 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
     badge_class = "badge-warning" if default_min_dias is not None else "badge-info"
     nav_items = [
         ("Dashboard", "/dashboard", title == "Dashboard"),
-        ("Pacientes", "/pacientes", title == "Pacientes"),
         ("Longa Permanência", "/longa-permanencia", title == "Longa Permanência"),
         ("Desfechos EGAA", "/desfechos", title == "Desfechos EGAA"),
         ("Configurações", "/configuracoes", title == "Configurações"),
@@ -1715,11 +1627,8 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
 
 
 @router.get("/pacientes", response_class=HTMLResponse)
-def pacientes_route() -> str:
-    return _patients_page(
-        "Pacientes",
-        "Visão filtrável de todos os pacientes internados em acompanhamento.",
-    )
+def pacientes_route() -> RedirectResponse:
+  return RedirectResponse(url="/dashboard", status_code=307)
 
 
 @router.get("/longa-permanencia", response_class=HTMLResponse)
@@ -1885,8 +1794,7 @@ def paciente_detail_route(prontuario: str) -> str:
       <p class="brand-subtitle">Detalhe do paciente</p>
       <nav class="nav">
         <a href="/dashboard">Dashboard</a>
-        <a class="primary" href="/pacientes">Voltar para Pacientes</a>
-        <a href="/longa-permanencia">Longa Permanência</a>
+        <a class="primary" href="/longa-permanencia">Longa Permanência</a>
         <a href="/desfechos">Desfechos EGAA</a>
         <a href="/configuracoes">Configurações</a>
       </nav>
@@ -1900,7 +1808,7 @@ def paciente_detail_route(prontuario: str) -> str:
             <p class="subtitle" id="subtitulo">Carregando informações do paciente...</p>
           </div>
           <div class="actions">
-            <a class="pill-link" href="/pacientes">Voltar</a>
+            <a class="pill-link" href="/dashboard">Voltar</a>
             <a class="pill-link" id="linkLonga" href="/longa-permanencia">Longa permanência</a>
           </div>
         </div>
@@ -2768,7 +2676,6 @@ def configuracoes_route() -> str:
       <p class="brand-subtitle">Administração</p>
       <nav class="nav">
         <a href="/dashboard">Dashboard</a>
-        <a href="/pacientes">Pacientes</a>
         <a href="/longa-permanencia">Longa Permanência</a>
         <a href="/desfechos">Desfechos EGAA</a>
         <a class="primary" href="/configuracoes">Configurações</a>
@@ -3408,7 +3315,6 @@ def desfechos_route() -> str:
       </div>
       <nav class="nav">
         <a href="/dashboard">Dashboard</a>
-        <a href="/pacientes">Pacientes</a>
         <a href="/longa-permanencia">Longa Permanência</a>
         <a class="primary" href="/desfechos">Desfechos EGAA</a>
         <a href="/configuracoes">Configurações</a>
