@@ -2112,6 +2112,12 @@ def paciente_detail_route(prontuario: str) -> str:
             <p class="subtitle" id="subtitulo">Carregando informações do paciente...</p>
           </div>
           <div class="actions">
+            <div style="display:flex;gap:8px;align-items:center;margin-right:8px;">
+              <input type="text" id="quickSearchPaciente" placeholder="Outro prontuário..."
+                style="padding:8px 12px;border:1px solid var(--panel-border);border-radius:999px;font-size:13px;width:160px;"
+                onkeydown="if(event.key==='Enter'){{const v=this.value.trim();if(v)window.location.href='/paciente/'+encodeURIComponent(v)}}" />
+              <a class="pill-link" href="/desfechos" style="padding:8px 14px;">Desfechos</a>
+            </div>
             <a class="pill-link" href="/dashboard">Voltar</a>
             <a class="pill-link" id="linkLonga" href="/longa-permanencia">Longa permanência</a>
           </div>
@@ -3784,6 +3790,12 @@ def desfechos_route() -> str:
             <p class="subtitle">Altas e óbitos com atuação do EGAA — demonstrando resultados da desospitalização</p>
           </div>
           <div class="header-actions">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="quickSearch" placeholder="Buscar prontuário..."
+                style="padding:8px 14px;border:1px solid var(--panel-border);border-radius:8px;font-size:14px;width:180px;"
+                onkeydown="if(event.key==='Enter'){navegarPaciente()}" />
+              <button class="btn-secondary" onclick="navegarPaciente()" title="Ir para paciente" style="padding:8px 12px;">🔍</button>
+            </div>
             <button class="btn-primary" onclick="openModal()">+ Novo Desfecho</button>
           </div>
         </div>
@@ -3929,6 +3941,20 @@ def desfechos_route() -> str:
       } catch { return value; }
     }
 
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>'"]/g, function(c) {
+        return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c] || c;
+      });
+    }
+
+    function navegarPaciente() {
+      const pront = document.getElementById('quickSearch').value.trim();
+      if (pront) {
+        window.location.href = '/paciente/' + encodeURIComponent(pront);
+      }
+    }
+
     let allDesfechos = [];
 
     async function loadDesfechos() {
@@ -3984,13 +4010,16 @@ def desfechos_route() -> str:
       document.getElementById('desfechosBody').innerHTML = filtered.map(d => {
         const badgeClass = d.tipo === 'alta' ? 'badge-success' : 'badge-danger';
         const label = d.tipo === 'alta' ? 'Alta' : 'Óbito';
+        const prontUrl = '/paciente/' + encodeURIComponent(d.prontuario);
         return '<tr>' +
-          '<td class="mono">' + d.prontuario + '</td>' +
+          '<td class="mono"><a href="' + prontUrl + '" style="color:var(--brand);text-decoration:none;font-weight:700;">' + escapeHtml(d.prontuario) + '</a></td>' +
           '<td><span class="badge ' + badgeClass + '">' + label + '</span></td>' +
           '<td class="muted">' + fmtDate(d.data_desfecho) + '</td>' +
           '<td>' + (d.usuario_responsavel || '-') + '</td>' +
-          '<td class="muted" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (d.descricao || '-') + '</td>' +
-          '<td style="text-align:right;"><button class="btn-danger" onclick="deleteDesfecho(' + d.id + ')">Remover</button></td>' +
+          '<td class="muted" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (d.descricao || '-') + '</td>' +
+          '<td style="text-align:right;white-space:nowrap;">' +
+            '<a href="' + prontUrl + '" class="btn-secondary" style="padding:4px 10px;font-size:12px;text-decoration:none;margin-right:4px;">Abrir</a>' +
+            '<button class="btn-danger" onclick="deleteDesfecho(' + d.id + ')">Remover</button></td>' +
           '</tr>';
       }).join('');
     }
