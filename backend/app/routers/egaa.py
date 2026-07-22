@@ -510,6 +510,7 @@ def listar_desfechos(
     tipo: str | None = Query(default=None),
     data_inicio: date | None = Query(default=None),
     data_fim: date | None = Query(default=None),
+    apenas_egaa: bool = Query(default=True, description="Se True, mostra apenas desfechos registrados manualmente pelo EGAA (com responsável)"),
     db: Session = Depends(get_db),
 ) -> list[EgaaDesfechoResponse]:
     query = select(EgaaDesfecho)
@@ -521,6 +522,9 @@ def listar_desfechos(
         query = query.where(EgaaDesfecho.data_desfecho >= data_inicio)
     if data_fim:
         query = query.where(EgaaDesfecho.data_desfecho <= data_fim)
+    if apenas_egaa:
+        # Desfechos registrados manualmente têm usuário responsável preenchido
+        query = query.where(EgaaDesfecho.usuario_responsavel.isnot(None))
 
     rows = db.execute(
         query.order_by(
@@ -615,22 +619,36 @@ def delete_desfecho(
     db.commit()
 
 
+def _desfecho_base_filter(apenas_egaa: bool = True):
+    """Retorna o filtro base para consultas de desfecho."""
+    if apenas_egaa:
+        return EgaaDesfecho.usuario_responsavel.isnot(None)
+    return True  # sem filtro
+
+
 @router.get("/indicadores/desfechos", response_model=EgaaIndicadoresDesfechoResponse)
-def get_indicadores_desfecho(db: Session = Depends(get_db)) -> EgaaIndicadoresDesfechoResponse:
+def get_indicadores_desfecho(
+    apenas_egaa: bool = Query(default=True, description="Se True, mostra apenas desfechos registrados manualmente pelo EGAA"),
+    db: Session = Depends(get_db),
+) -> EgaaIndicadoresDesfechoResponse:
     try:
-        total_desfechos = db.scalar(select(func.count()).select_from(EgaaDesfecho)) or 0
+        base_filter = _desfecho_base_filter(apenas_egaa)
+        total_desfechos = db.scalar(
+            select(func.count()).select_from(EgaaDesfecho).where(base_filter)
+        ) or 0
         total_altas = db.scalar(
-            select(func.count()).select_from(EgaaDesfecho).where(EgaaDesfecho.tipo == "alta")
+            select(func.count()).select_from(EgaaDesfecho).where(EgaaDesfecho.tipo == "alta", base_filter)
         ) or 0
         total_obitos = db.scalar(
-            select(func.count()).select_from(EgaaDesfecho).where(EgaaDesfecho.tipo == "obito")
+            select(func.count()).select_from(EgaaDesfecho).where(EgaaDesfecho.tipo == "obito", base_filter)
         ) or 0
         pacientes_com_desfecho = db.scalar(
-            select(func.count(func.distinct(EgaaDesfecho.prontuario)))
+            select(func.count(func.distinct(EgaaDesfecho.prontuario))).where(base_filter)
         ) or 0
 
         tipo_rows = db.execute(
             select(EgaaDesfecho.tipo, func.count().label("total"))
+            .where(base_filter)
             .group_by(EgaaDesfecho.tipo)
             .order_by(EgaaDesfecho.tipo)
         ).all()
@@ -640,7 +658,7 @@ def get_indicadores_desfecho(db: Session = Depends(get_db)) -> EgaaIndicadoresDe
                 func.date_format(EgaaDesfecho.data_desfecho, "%Y-%m").label("mes"),
                 func.count().label("total"),
             )
-            .where(EgaaDesfecho.data_desfecho.is_not(None))
+            .where(EgaaDesfecho.data_desfecho.is_not(None), base_filter)
             .group_by("mes")
             .order_by("mes")
         ).all()

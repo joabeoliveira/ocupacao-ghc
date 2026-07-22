@@ -3825,6 +3825,10 @@ def desfechos_route() -> str:
                 <option value="alta">Altas</option>
                 <option value="obito">Óbitos</option>
               </select>
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer;white-space:nowrap;">
+                <input type="checkbox" id="mostrarTodos" onchange="loadDesfechos()" />
+                Mostrar todos (importados)
+              </label>
             </div>
           </div>
           <div class="card-body">
@@ -3929,7 +3933,9 @@ def desfechos_route() -> str:
 
     async function loadDesfechos() {
       try {
-        const res = await fetch(API + '/egaa/desfechos');
+        const mostrarTodos = document.getElementById('mostrarTodos')?.checked || false;
+        const url = mostrarTodos ? (API + '/egaa/desfechos?apenas_egaa=false') : (API + '/egaa/desfechos');
+        const res = await fetch(url);
         if (!res.ok) throw new Error(await res.text());
         allDesfechos = await res.json();
         applyFilters();
@@ -3941,7 +3947,9 @@ def desfechos_route() -> str:
 
     async function loadIndicadores() {
       try {
-        const res = await fetch(API + '/egaa/indicadores/desfechos');
+        const mostrarTodos = document.getElementById('mostrarTodos')?.checked || false;
+        const url = mostrarTodos ? (API + '/egaa/indicadores/desfechos') : (API + '/egaa/indicadores/desfechos?apenas_egaa=true');
+        const res = await fetch(url);
         if (!res.ok) return;
         const data = await res.json();
         document.getElementById('totalDesfechos').textContent = data.total_desfechos ?? 0;
