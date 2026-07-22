@@ -14,6 +14,8 @@ RUN pip install --upgrade pip \
 
 COPY backend /app/backend
 COPY src /app/src
+COPY scripts /app/scripts
+COPY migrations /app/migrations
 
 RUN mkdir -p /app/backend/tmp
 
