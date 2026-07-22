@@ -252,6 +252,7 @@ def normalize_historico(df: pd.DataFrame, metadata: dict[str, Any], lote_importa
     normalized["data_internacao"] = _get_series_by_alias(df, alias_map, ["DATA_INTERNACAO", "DATA INTERNACAO"], required=True).apply(parse_datetime_br)
     normalized["data_alta"] = _get_series_by_alias(df, alias_map, ["DATA_ALTA"]).apply(parse_datetime_br)
     normalized["data_obito"] = _get_series_by_alias(df, alias_map, ["DATA_OBITO"]).apply(parse_datetime_br)
+    normalized["status_leito"] = None
     normalized["especialidade"] = _get_series_by_alias(
         df,
         alias_map,

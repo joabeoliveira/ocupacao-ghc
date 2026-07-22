@@ -176,12 +176,8 @@ async def upload_historico(file: UploadFile = File(...)) -> UploadCensoResponse:
 
     try:
         df = processar_historico(tmp_path, persist=True, lote_importacao_id=lote_importacao_id)
-        desfechos_criados = _criar_desfechos_do_lote(lote_importacao_id)
-        msg = "Arquivo processado com sucesso na rotina histórica."
-        if desfechos_criados:
-            msg += f" {desfechos_criados} desfecho(s) gerado(s) automaticamente."
         return UploadCensoResponse(
-            message=msg,
+            message="Arquivo processado com sucesso na rotina histórica.",
             nome_arquivo=file.filename or tmp_path.name,
             lote_importacao_id=lote_importacao_id,
             linhas_processadas=len(df),
@@ -202,13 +198,8 @@ async def upload_arquivo_auto(file: UploadFile = File(...)) -> UploadCensoRespon
     try:
         # Auto detecta historico/censo a partir do cabecalho do arquivo.
         df = process_file(tmp_path, persist=True, lote_importacao_id=lote_importacao_id)
-        # Se for histórico, criar desfechos automaticamente
-        desfechos_criados = _criar_desfechos_do_lote(lote_importacao_id)
-        msg = "Arquivo processado com sucesso (modo automático)."
-        if desfechos_criados:
-            msg += f" {desfechos_criados} desfecho(s) gerado(s) automaticamente."
         return UploadCensoResponse(
-            message=msg,
+            message="Arquivo processado com sucesso (modo automático).",
             nome_arquivo=file.filename or tmp_path.name,
             lote_importacao_id=lote_importacao_id,
             linhas_processadas=len(df),
