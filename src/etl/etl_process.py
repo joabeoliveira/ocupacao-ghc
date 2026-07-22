@@ -335,6 +335,7 @@ def normalize_censo(df: pd.DataFrame, metadata: dict[str, Any], lote_importacao_
     normalized["idade_meses"] = _get_series_by_alias(df, alias_map, ["IDADE (m)", "IDADE_MES"]).apply(clean_int)
     normalized["data_internacao"] = _get_series_by_alias(df, alias_map, ["DATA INTERNACAO", "DATA_INTERNACAO"], required=True).apply(parse_datetime_br)
     normalized["data_alta"] = None
+    normalized["data_obito"] = None
     normalized["especialidade"] = _get_series_by_alias(
         df,
         alias_map,
