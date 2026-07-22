@@ -251,6 +251,7 @@ def normalize_historico(df: pd.DataFrame, metadata: dict[str, Any], lote_importa
     normalized["idade_meses"] = _get_series_by_alias(df, alias_map, ["IDADE_MES", "IDADE (m)"]).apply(clean_int)
     normalized["data_internacao"] = _get_series_by_alias(df, alias_map, ["DATA_INTERNACAO", "DATA INTERNACAO"], required=True).apply(parse_datetime_br)
     normalized["data_alta"] = _get_series_by_alias(df, alias_map, ["DATA_ALTA"]).apply(parse_datetime_br)
+    normalized["data_obito"] = _get_series_by_alias(df, alias_map, ["DATA_OBITO"]).apply(parse_datetime_br)
     normalized["especialidade"] = _get_series_by_alias(
         df,
         alias_map,
@@ -277,6 +278,7 @@ def normalize_historico(df: pd.DataFrame, metadata: dict[str, Any], lote_importa
                 row["prontuario"],
                 row["data_internacao"],
                 row["data_alta"],
+                row["data_obito"],
                 row["leito"],
                 row["cid_internacao_codigo"],
                 row["fonte_dado"],
@@ -424,6 +426,7 @@ def get_ocupacao_table_definition(metadata: MetaData) -> Table:
         Column("idade_meses", Integer),
         Column("data_internacao", DATETIME),
         Column("data_alta", DATETIME),
+        Column("data_obito", DATETIME),
         Column("dias_internacao", Integer),
         Column("especialidade", String(150), nullable=False),
         Column("unidade", String(150)),
@@ -513,6 +516,7 @@ def persist_dataframe(df: pd.DataFrame, engine) -> int:
                 idade_anos=statement.inserted.idade_anos,
                 idade_meses=statement.inserted.idade_meses,
                 data_alta=statement.inserted.data_alta,
+                data_obito=statement.inserted.data_obito,
                 dias_internacao=statement.inserted.dias_internacao,
                 especialidade=statement.inserted.especialidade,
                 unidade=statement.inserted.unidade,

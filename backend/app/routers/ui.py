@@ -1654,7 +1654,7 @@ def _patients_page(title: str, subtitle: str, *, default_min_dias: int | None = 
           html += pendentes.map(function(p) {{
             return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #edf2f7;">' +
               '<span style="font-size:13px;">⬜ ' + escapeHtml(p.codigo || '--') + '</span>' +
-              '<button class="resolver-pendencia" data-id="' + p.id + '" data-pront="' + prontuario + '" style="padding:3px 8px;font-size:11px;background:#EEF5FA;color:var(--brand);border:1px solid var(--panel-border);border-radius:6px;cursor:pointer;">Resolver</button>' +
+              '<button class="resolver-pendencia" data-id="' + p.id + '" data-pront="' + prontuario + '" style="padding:3px 8px;font-size:11px;background:#EEF5FA;color:var(--brand);border:1px solid var(--panel-border);border-radius:6px;cursor:pointer;">Resolvido</button>' +
               '</div>';
           }}).join('');
 
@@ -2134,6 +2134,21 @@ def paciente_detail_route(prontuario: str) -> str:
             </div>
             <div class="section-body">
               <div id="resumo" class="muted">Aguardando dados...</div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-header">
+              <div>
+                <h2>Desfecho</h2>
+                <p>Registro de alta ou óbito do paciente.</p>
+              </div>
+            </div>
+            <div class="section-body">
+              <div id="desfechoInfo" class="muted">Carregando...</div>
+              <div id="desfechoActions" class="actions" style="display:none;">
+                <button type="button" id="registrarDesfecho" class="secondary">Registrar desfecho</button>
+              </div>
             </div>
           </section>
 
@@ -2777,6 +2792,136 @@ def paciente_detail_route(prontuario: str) -> str:
       }});
     }}
 
+    // ─── Desfecho ──────────────────────────────────────────────
+    const desfechoInfoEl = document.getElementById('desfechoInfo');
+    const desfechoActionsEl = document.getElementById('desfechoActions');
+    const registrarDesfechoBtn = document.getElementById('registrarDesfecho');
+
+    function fmtDateBR(value) {{
+      if (!value) return '--';
+      try {{
+        const d = new Date(value + (typeof value === 'string' && /^\\d{{4}}-\\d{{2}}-\\d{{2}}$/.test(value) ? 'T00:00:00' : ''));
+        return d.toLocaleDateString('pt-BR');
+      }} catch {{
+        return String(value);
+      }}
+    }}
+
+    async function loadPacienteDesfecho() {{
+      if (!desfechoInfoEl) return;
+      try {{
+        const res = await fetch(`${{API_PREFIX}}/egaa/desfechos?prontuario=${{encodeURIComponent(PRONTUARIO)}}`);
+        if (!res.ok) throw new Error('Erro ao carregar desfecho');
+        const items = await res.json();
+        const list = Array.isArray(items) ? items : [];
+        if (list.length > 0) {{
+          const d = list[0];
+          const badgeClass = d.tipo === 'obito' ? 'badge-error' : 'badge-success';
+          const badgeLabel = d.tipo === 'obito' ? 'Óbito' : 'Alta';
+          desfechoInfoEl.innerHTML = `
+            <div><span class="badge ${{badgeClass}}" style="font-size:14px;padding:8px 14px;">${{badgeLabel}}</span></div>
+            <div style="margin-top:10px;"><strong>Data:</strong> ${{fmtDateBR(d.data_desfecho)}}</div>
+            <div><strong>Descrição:</strong> ${{escapeHtml(d.descricao || '--')}}</div>
+            <div><strong>Responsável:</strong> ${{escapeHtml(d.usuario_responsavel || '--')}}</div>
+          `;
+          if (desfechoActionsEl) desfechoActionsEl.style.display = 'none';
+        }} else {{
+          desfechoInfoEl.innerHTML = '<span class="badge badge-warning" style="font-size:14px;padding:8px 14px;">Pendente</span><p style="margin-top:10px;">Nenhum desfecho registrado para este paciente.</p>';
+          if (desfechoActionsEl) desfechoActionsEl.style.display = 'flex';
+        }}
+      }} catch {{
+        desfechoInfoEl.innerHTML = '<span class="muted">Erro ao carregar desfecho.</span>';
+      }}
+    }}
+
+    // Modal de desfecho
+    const desfechoModal = document.createElement('div');
+    desfechoModal.innerHTML = `
+      <div id="desfechoModalOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;">
+        <div style="background:#fff;border-radius:16px;padding:24px;max-width:460px;width:90%;box-shadow:0 16px 48px rgba(0,0,0,0.2);">
+          <h3 style="margin:0 0 16px;color:var(--brand-strong);">Registrar Desfecho</h3>
+          <form id="desfechoForm">
+            <div class="field">
+              <label>Prontuário</label>
+              <input id="desfechoProntuario" value="${{PRONTUARIO}}" readonly style="background:#f5f7fa;padding:10px 12px;border-radius:10px;border:1px solid #cfd8e3;width:100%;box-sizing:border-box;" />
+            </div>
+            <div class="field">
+              <label>Tipo</label>
+              <select id="desfechoTipo" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #cfd8e3;background:#fff;">
+                <option value="alta">Alta</option>
+                <option value="obito">Óbito</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Data do desfecho</label>
+              <input id="desfechoData" type="date" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #cfd8e3;background:#fff;box-sizing:border-box;" />
+            </div>
+            <div class="field">
+              <label>Descrição</label>
+              <textarea id="desfechoDescricao" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #cfd8e3;background:#fff;min-height:80px;font:inherit;resize:vertical;box-sizing:border-box;" placeholder="Motivo do desfecho (opcional)"></textarea>
+            </div>
+            <div class="field">
+              <label>Responsável EGAA</label>
+              <input id="desfechoResponsavel" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #cfd8e3;background:#fff;box-sizing:border-box;" placeholder="Nome do profissional (opcional)" />
+            </div>
+            <div class="actions" style="margin-top:16px;">
+              <button type="submit" style="padding:10px 12px;border-radius:8px;border:none;background:var(--brand);color:#fff;cursor:pointer;font-weight:600;">Salvar desfecho</button>
+              <button type="button" id="cancelarDesfecho" style="padding:10px 12px;border-radius:8px;border:1px solid var(--panel-border);background:#EEF5FA;color:var(--brand);cursor:pointer;font-weight:600;">Cancelar</button>
+              <span id="desfechoStatus" style="font-size:13px;color:var(--muted);"></span>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(desfechoModal);
+
+    const desfechoOverlay = document.getElementById('desfechoModalOverlay');
+    const desfechoForm = document.getElementById('desfechoForm');
+    const desfechoDataInput = document.getElementById('desfechoData');
+
+    // Preencher data atual
+    desfechoDataInput.value = new Date().toISOString().split('T')[0];
+
+    if (registrarDesfechoBtn) {{
+      registrarDesfechoBtn.addEventListener('click', () => {{
+        desfechoOverlay.style.display = 'flex';
+      }});
+    }}
+
+    document.getElementById('cancelarDesfecho').addEventListener('click', () => {{
+      desfechoOverlay.style.display = 'none';
+    }});
+
+    desfechoOverlay.addEventListener('click', (e) => {{
+      if (e.target === desfechoOverlay) desfechoOverlay.style.display = 'none';
+    }});
+
+    desfechoForm.addEventListener('submit', async (e) => {{
+      e.preventDefault();
+      const statusEl = document.getElementById('desfechoStatus');
+      statusEl.textContent = 'Salvando...';
+      try {{
+        const payload = {{
+          prontuario: PRONTUARIO,
+          tipo: document.getElementById('desfechoTipo').value,
+          data_desfecho: document.getElementById('desfechoData').value,
+          descricao: document.getElementById('desfechoDescricao').value.trim() || null,
+          usuario_responsavel: document.getElementById('desfechoResponsavel').value.trim() || null,
+        }};
+        const res = await fetch(`${{API_PREFIX}}/egaa/desfechos`, {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify(payload),
+        }});
+        if (!res.ok) throw new Error(await res.text());
+        statusEl.textContent = 'Desfecho registrado com sucesso!';
+        desfechoOverlay.style.display = 'none';
+        await loadPacienteDesfecho();
+      }} catch (err) {{
+        statusEl.textContent = 'Erro: ' + (err.message || 'Falha ao salvar');
+      }}
+    }});
+
     drafts = [createDraft()];
     renderDrafts();
     (async () => {{
@@ -2785,6 +2930,7 @@ def paciente_detail_route(prontuario: str) -> str:
       await loadHistorico();
       await loadCodigosPendencia();
       await loadPendencias();
+      await loadPacienteDesfecho();
     }})();
   </script>
 </body>

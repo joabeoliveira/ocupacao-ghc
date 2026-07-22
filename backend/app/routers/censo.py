@@ -10,7 +10,7 @@ from sqlalchemy import and_, case, desc, func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import EgaaEvolucaoPaciente, EgaaIntervencaoPaciente, OcupacaoLeitoGHC
+from app.models import EgaaDesfecho, EgaaEvolucaoPaciente, EgaaIntervencaoPaciente, OcupacaoLeitoGHC
 from app.schemas import (
     CensoKPIsResponse,
     EvolucaoPacienteResponse,
@@ -275,13 +275,25 @@ def get_pacientes_internados(
         if data_inicio is None and data_fim is None:
             return PacientesInternadosPage(total=0, page=page, page_size=page_size, items=[])
 
-        base_query = _filtered_active_query(data_inicio, data_fim, lote_id)
-        if especialidade:
-            base_query = base_query.where(OcupacaoLeitoGHC.especialidade == especialidade)
-        if unidade:
-            base_query = base_query.where(OcupacaoLeitoGHC.unidade == unidade)
+        # Quando busca por prontuario específico, incluir registros históricos
+        # (pacientes que já receberam alta não estão mais no censo ativo)
         if prontuario:
-            base_query = base_query.where(OcupacaoLeitoGHC.prontuario.like(f"%{prontuario}%"))
+            base_query = select(OcupacaoLeitoGHC).where(
+                and_(
+                    OcupacaoLeitoGHC.fonte_dado.in_(["censo_diario", "historico_internacao"]),
+                    OcupacaoLeitoGHC.prontuario.like(f"%{prontuario}%"),
+                )
+            )
+            if min_dias is not None:
+                base_query = base_query.where(OcupacaoLeitoGHC.dias_internacao >= min_dias)
+            if idade_minima is not None:
+                base_query = base_query.where(OcupacaoLeitoGHC.idade_anos >= idade_minima)
+        else:
+            base_query = _filtered_active_query(data_inicio, data_fim, lote_id)
+            if especialidade:
+                base_query = base_query.where(OcupacaoLeitoGHC.especialidade == especialidade)
+            if unidade:
+                base_query = base_query.where(OcupacaoLeitoGHC.unidade == unidade)
         if nome:
             base_query = base_query.where(OcupacaoLeitoGHC.nome_paciente.like(f"%{nome}%"))
         if min_dias is not None:
@@ -298,12 +310,25 @@ def get_pacientes_internados(
         ).scalars().all()
 
         egas_map = _egaa_summary_map(db, [row.prontuario for row in rows if row.prontuario])
+        prontuarios_list = [row.prontuario for row in rows if row.prontuario]
+        desfechos_map = {}
+        if prontuarios_list:
+            desfechos_rows = db.execute(
+                select(EgaaDesfecho.prontuario, EgaaDesfecho.tipo, EgaaDesfecho.data_desfecho)
+                .where(EgaaDesfecho.prontuario.in_(prontuarios_list))
+            ).all()
+            for d in desfechos_rows:
+                desfechos_map[d.prontuario] = {"desfecho_tipo": d.tipo, "desfecho_data": d.data_desfecho}
+
         items = [
             PacienteInternadoResponse.model_validate(row).model_copy(
-                update=egas_map.get(
-                    row.prontuario,
-                    {"egaa_total_atuacoes": 0, "egaa_ultima_atuacao": None},
-                )
+                update={
+                    **egas_map.get(
+                        row.prontuario,
+                        {"egaa_total_atuacoes": 0, "egaa_ultima_atuacao": None},
+                    ),
+                    **desfechos_map.get(row.prontuario, {"desfecho_tipo": None, "desfecho_data": None}),
+                }
             )
             for row in rows
         ]
@@ -318,24 +343,46 @@ def get_pacientes_internados(
     )
 
 
+def _carregar_desfecho(db: Session, prontuario: str) -> dict[str, object]:
+    """Retorna desfecho_tipo e desfecho_data do paciente, se houver."""
+    desfecho = db.scalar(
+        select(EgaaDesfecho).where(EgaaDesfecho.prontuario == prontuario)
+        .order_by(desc(EgaaDesfecho.data_desfecho))
+        .limit(1)
+    )
+    if desfecho is None:
+        return {"desfecho_tipo": None, "desfecho_data": None}
+    return {"desfecho_tipo": desfecho.tipo, "desfecho_data": desfecho.data_desfecho}
+
+
 @router.get("/paciente/{prontuario}", response_model=PacienteInternadoResponse)
 def get_paciente_por_prontuario(
     prontuario: str,
     db: Session = Depends(get_db),
 ) -> PacienteInternadoResponse:
+    # 1. Tentar buscar no censo ativo
     data_inicio, data_fim, lote_id = _resolve_snapshot_bounds(db, None, None)
-    if data_inicio is None and data_fim is None:
-        raise HTTPException(status_code=404, detail="Paciente não encontrado.")
+    row = None
+    if data_inicio is not None and data_fim is not None:
+        query = select(OcupacaoLeitoGHC).where(_active_filter())
+        query = _apply_filters(query, data_inicio, data_fim, lote_id)
+        row = db.scalar(
+            query
+            .where(OcupacaoLeitoGHC.prontuario == prontuario)
+            .order_by(desc(OcupacaoLeitoGHC.dias_internacao), OcupacaoLeitoGHC.nome_paciente)
+        )
 
-    query = select(OcupacaoLeitoGHC).where(_active_filter())
-    query = _apply_filters(query, data_inicio, data_fim, lote_id)
-    row = db.scalar(
-        query
-        .where(OcupacaoLeitoGHC.prontuario == prontuario)
-        .order_by(desc(OcupacaoLeitoGHC.dias_internacao), OcupacaoLeitoGHC.nome_paciente)
-    )
+    # 2. Fallback: buscar em qualquer registro (histórico inclusive)
+    if row is None:
+        row = db.scalar(
+            select(OcupacaoLeitoGHC)
+            .where(OcupacaoLeitoGHC.prontuario == prontuario)
+            .order_by(desc(OcupacaoLeitoGHC.data_alta), desc(OcupacaoLeitoGHC.data_internacao))
+        )
+
     if row is None:
         raise HTTPException(status_code=404, detail="Paciente não encontrado.")
+
     egas_map = _egaa_summary_map(db, [prontuario])
 
     evolucao_row = db.scalar(
@@ -343,10 +390,13 @@ def get_paciente_por_prontuario(
     )
     evolucao_text = evolucao_row.evolucao if evolucao_row else None
 
+    desfecho = _carregar_desfecho(db, prontuario)
+
     return PacienteInternadoResponse.model_validate(row).model_copy(
         update={
             **egas_map.get(prontuario, {"egaa_total_atuacoes": 0, "egaa_ultima_atuacao": None}),
             "evolucao": evolucao_text,
+            **desfecho,
         }
     )
 
@@ -400,27 +450,50 @@ def export_pacientes_xlsx(
             headers={"Content-Disposition": 'attachment; filename="egaa_pacientes.xlsx"'},
         )
 
-    base_query = _filtered_active_query(data_inicio, data_fim)
-    if especialidade:
-        base_query = base_query.where(OcupacaoLeitoGHC.especialidade == especialidade)
-    if unidade:
-        base_query = base_query.where(OcupacaoLeitoGHC.unidade == unidade)
     if prontuario:
-        base_query = base_query.where(OcupacaoLeitoGHC.prontuario.like(f"%{prontuario}%"))
-    if nome:
-        base_query = base_query.where(OcupacaoLeitoGHC.nome_paciente.like(f"%{nome}%"))
-    if min_dias is not None:
-        base_query = base_query.where(OcupacaoLeitoGHC.dias_internacao >= min_dias)
-    if idade_minima is not None:
-        base_query = base_query.where(OcupacaoLeitoGHC.idade_anos >= idade_minima)
+        base_query = select(OcupacaoLeitoGHC).where(
+            and_(
+                OcupacaoLeitoGHC.fonte_dado.in_(["censo_diario", "historico_internacao"]),
+                OcupacaoLeitoGHC.prontuario.like(f"%{prontuario}%"),
+            )
+        )
+        if min_dias is not None:
+            base_query = base_query.where(OcupacaoLeitoGHC.dias_internacao >= min_dias)
+        if idade_minima is not None:
+            base_query = base_query.where(OcupacaoLeitoGHC.idade_anos >= idade_minima)
+    else:
+        base_query = _filtered_active_query(data_inicio, data_fim)
+        if especialidade:
+            base_query = base_query.where(OcupacaoLeitoGHC.especialidade == especialidade)
+        if unidade:
+            base_query = base_query.where(OcupacaoLeitoGHC.unidade == unidade)
+        if nome:
+            base_query = base_query.where(OcupacaoLeitoGHC.nome_paciente.like(f"%{nome}%"))
+        if min_dias is not None:
+            base_query = base_query.where(OcupacaoLeitoGHC.dias_internacao >= min_dias)
+        if idade_minima is not None:
+            base_query = base_query.where(OcupacaoLeitoGHC.idade_anos >= idade_minima)
 
     rows = db.execute(
         base_query.order_by(desc(OcupacaoLeitoGHC.dias_internacao), OcupacaoLeitoGHC.nome_paciente)
     ).scalars().all()
     egas_map = _egaa_summary_map(db, [row.prontuario for row in rows if row.prontuario])
+    prontuarios_list = [row.prontuario for row in rows if row.prontuario]
+    desfechos_map = {}
+    if prontuarios_list:
+        desfechos_rows = db.execute(
+            select(EgaaDesfecho.prontuario, EgaaDesfecho.tipo, EgaaDesfecho.data_desfecho)
+            .where(EgaaDesfecho.prontuario.in_(prontuarios_list))
+        ).all()
+        for d in desfechos_rows:
+            desfechos_map[d.prontuario] = {"desfecho_tipo": d.tipo, "desfecho_data": d.data_desfecho}
+
     data = [
         PacienteInternadoResponse.model_validate(row)
-        .model_copy(update=egas_map.get(row.prontuario, {"egaa_total_atuacoes": 0, "egaa_ultima_atuacao": None}))
+        .model_copy(update={
+            **egas_map.get(row.prontuario, {"egaa_total_atuacoes": 0, "egaa_ultima_atuacao": None}),
+            **desfechos_map.get(row.prontuario, {"desfecho_tipo": None, "desfecho_data": None}),
+        })
         .model_dump(mode="json")
         for row in rows
     ]

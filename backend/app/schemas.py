@@ -47,6 +47,8 @@ class PacienteInternadoResponse(BaseModel):
     evolucao: str | None = None
     egaa_total_atuacoes: int = 0
     egaa_ultima_atuacao: date | None = None
+    desfecho_tipo: str | None = None
+    desfecho_data: date | None = None
 
 
 class PacientesInternadosPage(BaseModel):
