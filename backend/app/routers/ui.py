@@ -2249,6 +2249,7 @@ def paciente_detail_route(prontuario: str) -> str:
     const form = document.getElementById('intervencaoForm');
     const adicionarAtuacaoBtn = document.getElementById('adicionarAtuacao');
     const limparAtuacoesBtn = document.getElementById('limparAtuacoes');
+    let pacienteData = null;
     let tiposOptions = [];
     let tiposById = {{}};
     let draftSeq = 0;
@@ -2397,22 +2398,46 @@ def paciente_detail_route(prontuario: str) -> str:
         return null;
       }}
       const data = await res.json();
+
+      // Detectar se paciente ja teve alta/obito
+      const temAlta = data.desfecho_tipo || data.data_alta || data.data_obito;
+      const labelDesfecho = data.desfecho_tipo === 'obito' ? 'Obito' : (data.desfecho_tipo === 'alta' ? 'Alta' : null);
+      const dataDesfecho = data.data_obito || data.data_alta;
+
+      // Subtitle
+      let subtitulo = data.nome_paciente || 'Paciente';
+      if (temAlta) {{
+        subtitulo += ' - ' + (labelDesfecho || 'Alta') + ' em ' + fmtDate(dataDesfecho);
+      }} else {{
+        subtitulo += ' - ' + (data.especialidade || '--');
+      }}
+      subtituloEl.textContent = subtitulo;
+
+      // KPIs
+      let labelKpi = temAlta ? 'Desfecho' : 'Dias';
+      let valorKpi = temAlta ? fmtDate(dataDesfecho) : (data.dias_internacao ?? '--');
       kpisEl.innerHTML = `
-        <div class="card"><strong>Prontuário</strong><div class="kpi-value">${{data.prontuario || '--'}}</div></div>
-        <div class="card"><strong>Dias</strong><div class="kpi-value">${{data.dias_internacao ?? '--'}}</div></div>
+        <div class="card"><strong>Prontuario</strong><div class="kpi-value">${{data.prontuario || '--'}}</div></div>
+        <div class="card"><strong>${{labelKpi}}</strong><div class="kpi-value">${{valorKpi}}</div></div>
         <div class="card"><strong>Idade</strong><div class="kpi-value">${{data.idade_anos ?? '--'}}</div></div>
         <div class="card"><strong>Unidade</strong><div class="kpi-value" style="font-size:18px; line-height:1.3">${{data.unidade || '--'}}</div></div>
       `;
-      subtituloEl.textContent = `${{data.nome_paciente || 'Paciente'}} · ${{data.especialidade || '--'}}`;
-      resumoEl.innerHTML = `
+
+      // Resumo
+      let resumoHtml = `
         <div><strong>Nome:</strong> ${{data.nome_paciente || '--'}}</div>
         <div><strong>Especialidade:</strong> ${{data.especialidade || '--'}}</div>
         <div><strong>Unidade:</strong> ${{data.unidade || '--'}}</div>
         <div><strong>Enfermaria:</strong> ${{data.enfermaria || '--'}}</div>
         <div><strong>Leito:</strong> ${{data.leito || '--'}}</div>
         <div><strong>CID:</strong> ${{data.cid_internacao_codigo || '--'}} ${{data.cid_internacao_descricao ? '- ' + data.cid_internacao_descricao : ''}}</div>
-        <div><strong>Internação:</strong> ${{fmtDate(data.data_internacao)}}</div>
+        <div><strong>Internacao:</strong> ${{fmtDate(data.data_internacao)}}</div>
       `;
+      if (data.data_alta) resumoHtml += '<div><strong>Data da Alta:</strong> ' + fmtDate(data.data_alta) + '</div>';
+      if (data.data_obito) resumoHtml += '<div><strong>Data do Obito:</strong> ' + fmtDate(data.data_obito) + '</div>';
+      if (data.tipo_alta) resumoHtml += '<div><strong>Tipo de Alta:</strong> ' + data.tipo_alta + '</div>';
+      resumoEl.innerHTML = resumoHtml;
+      pacienteData = data;
       const evolucaoEl = document.getElementById('evolucao');
       if (evolucaoEl) evolucaoEl.value = data.evolucao || '';
       return data;
@@ -2823,13 +2848,16 @@ def paciente_detail_route(prontuario: str) -> str:
         if (list.length > 0) {{
           const d = list[0];
           const badgeClass = d.tipo === 'obito' ? 'badge-error' : 'badge-success';
-          const badgeLabel = d.tipo === 'obito' ? 'Óbito' : 'Alta';
-          desfechoInfoEl.innerHTML = `
+          const badgeLabel = d.tipo === 'obito' ? 'Obito' : 'Alta';
+          let desfCardHtml = `
             <div><span class="badge ${{badgeClass}}" style="font-size:14px;padding:8px 14px;">${{badgeLabel}}</span></div>
-            <div style="margin-top:10px;"><strong>Data:</strong> ${{fmtDateBR(d.data_desfecho)}}</div>
-            <div><strong>Descrição:</strong> ${{escapeHtml(d.descricao || '--')}}</div>
-            <div><strong>Responsável:</strong> ${{escapeHtml(d.usuario_responsavel || '--')}}</div>
+            <div style="margin-top:10px;"><strong>Data do desfecho:</strong> ${{fmtDateBR(d.data_desfecho)}}</div>
+            <div><strong>Descricao:</strong> ${{escapeHtml(d.descricao || '--')}}</div>
+            <div><strong>Responsavel:</strong> ${{escapeHtml(d.usuario_responsavel || '--')}}</div>
           `;
+          if (pacienteData && pacienteData.data_alta) desfCardHtml += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #edf2f7;"><strong>Data de Alta (Sist.):</strong> ' + fmtDateBR(pacienteData.data_alta) + '</div>';
+          if (pacienteData && pacienteData.tipo_alta) desfCardHtml += '<div><strong>Tipo de Alta (Sist.):</strong> ' + escapeHtml(pacienteData.tipo_alta) + '</div>';
+          desfechoInfoEl.innerHTML = desfCardHtml;
           if (desfechoActionsEl) desfechoActionsEl.style.display = 'none';
         }} else {{
           desfechoInfoEl.innerHTML = '<span class="badge badge-warning" style="font-size:14px;padding:8px 14px;">Pendente</span><p style="margin-top:10px;">Nenhum desfecho registrado para este paciente.</p>';

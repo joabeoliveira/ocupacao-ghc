@@ -19,6 +19,7 @@ class OcupacaoLeitoGHC(Base):
     idade_meses: Mapped[int | None] = mapped_column(Integer, nullable=True)
     data_internacao: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     data_alta: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    data_obito: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     dias_internacao: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     internado_ativo: Mapped[int | None] = mapped_column(Integer, nullable=True)
     especialidade: Mapped[str] = mapped_column(String(150), nullable=False, index=True)

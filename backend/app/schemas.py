@@ -44,6 +44,9 @@ class PacienteInternadoResponse(BaseModel):
     cid_internacao_codigo: str | None = None
     cid_internacao_descricao: str | None = None
     data_snapshot: date | None = None
+    data_alta: datetime | None = None
+    data_obito: datetime | None = None
+    tipo_alta: str | None = None
     evolucao: str | None = None
     egaa_total_atuacoes: int = 0
     egaa_ultima_atuacao: date | None = None
